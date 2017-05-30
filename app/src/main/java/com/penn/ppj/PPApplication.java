@@ -432,6 +432,7 @@ public class PPApplication extends Application {
     public static void getSocketPush() {
     }
 
+    //刷新CurrentUser
     public static void refreshCurrentUser() {
         PPRetrofit.getInstance().api("user.startup", null)
                 .subscribeOn(Schedulers.io())
@@ -461,6 +462,53 @@ public class PPApplication extends Application {
                 );
     }
 
+    //校验password
+    public static String isPasswordValid(String password) {
+        String error = "";
+        if (TextUtils.isEmpty(password)) {
+            error = getContext().getString(R.string.error_field_required);
+        } else if (!Pattern.matches("\\w{6,12}", password.toString())) {
+            error = getContext().getString(R.string.error_invalid_password);
+        }
+
+        return error;
+    }
+
+    //校验nickname
+    public static String isNicknameValid(String nickname) {
+        String error = "";
+        if (TextUtils.isEmpty(nickname)) {
+            error = getContext().getString(R.string.error_field_required);
+        } else if (!Pattern.matches("\\w{3,12}", nickname.toString())) {
+            error = getContext().getString(R.string.error_invalid_nickname);
+        }
+
+        return error;
+    }
+
+    //校验username
+    public static String isUsernameValid(String phone) {
+        String error = "";
+        if (TextUtils.isEmpty(phone)) {
+            error = getContext().getString(R.string.error_field_required);
+        } else if (!Pattern.matches("\\d{11}", phone)) {
+            error = getContext().getString(R.string.error_invalid_phone);
+        }
+
+        return error;
+    }
+
+    //校验验证码
+    public static String isVerifyCodeValid(String verifyCode) {
+        String error = "";
+        if (TextUtils.isEmpty(verifyCode)) {
+            error = getContext().getString(R.string.error_field_required);
+        } else if (!Pattern.matches("\\d{6}", verifyCode)) {
+            error = getContext().getString(R.string.error_invalid_verify_code);
+        }
+
+        return error;
+    }
     //------------------------------private------------------------------
     //设置DefaultConfiguration for 登录用户
     public static void initRealm(String userId) {

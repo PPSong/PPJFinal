@@ -6,6 +6,7 @@ import android.databinding.DataBindingUtil;
 import android.net.Uri;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
@@ -16,16 +17,23 @@ import android.widget.EditText;
 import android.widget.TextView;
 
 import com.jakewharton.rxbinding2.view.RxView;
+import com.jakewharton.rxbinding2.widget.RxTextView;
 import com.penn.ppj.databinding.ActivityLoginBinding;
 import com.penn.ppj.databinding.FragmentLoginBinding;
 
 import java.util.concurrent.TimeUnit;
 
+import io.reactivex.Observable;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.annotations.NonNull;
 import io.reactivex.functions.Action;
+import io.reactivex.functions.BiFunction;
 import io.reactivex.functions.Consumer;
+import io.reactivex.functions.Function;
+import io.reactivex.functions.Function6;
 import io.reactivex.schedulers.Schedulers;
+
+import static com.jakewharton.rxbinding2.widget.RxTextView.textChanges;
 
 public class LoginFragment extends Fragment {
     //变量
@@ -84,6 +92,71 @@ public class LoginFragment extends Fragment {
                         new Consumer<Object>() {
                             public void accept(Object o) {
                                 login();
+                            }
+                        }
+                );
+
+        //手机输入监控
+        Observable<String> usernameInputObservable = RxTextView.textChanges(binding.username)
+                .skip(1)
+                .map(
+                        new Function<CharSequence, String>() {
+                            @Override
+                            public String apply(CharSequence charSequence) throws Exception {
+                                return PPApplication.isUsernameValid(charSequence.toString());
+                            }
+                        }
+                )
+                .doOnNext(
+                        new Consumer<String>() {
+                            @Override
+                            public void accept(String error) throws Exception {
+                                binding.usernameInputLayout.setError(TextUtils.isEmpty(error) ? null : error);
+                            }
+                        }
+                );
+
+        //密码输入监控
+        Observable<String> passwordInputObservable = RxTextView.textChanges(binding.password)
+                .skip(1)
+                .map(
+                        new Function<CharSequence, String>() {
+                            @Override
+                            public String apply(CharSequence charSequence) throws Exception {
+                                return PPApplication.isPasswordValid(charSequence.toString());
+                            }
+                        }
+                )
+                .doOnNext(
+                        new Consumer<String>() {
+                            @Override
+                            public void accept(String error) throws Exception {
+                                binding.passwordInputLayout.setError(TextUtils.isEmpty(error) ? null : error);
+                            }
+                        }
+                );
+
+        //登录按钮是否可用
+        Observable
+                .combineLatest(
+                        usernameInputObservable,
+                        passwordInputObservable,
+                        new BiFunction<String, String, Boolean>() {
+
+                            @Override
+                            public Boolean apply(String s, String s2) throws Exception {
+                                return TextUtils.isEmpty(s) && TextUtils.isEmpty(s2);
+                            }
+                        }
+                )
+                .subscribeOn(AndroidSchedulers.mainThread())
+                .distinctUntilChanged()
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        new Consumer<Boolean>() {
+                            @Override
+                            public void accept(Boolean aBoolean) throws Exception {
+                                binding.loginButton.setEnabled(aBoolean);
                             }
                         }
                 );
