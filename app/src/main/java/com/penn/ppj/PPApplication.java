@@ -51,8 +51,6 @@ import io.socket.client.IO;
 import io.socket.client.Socket;
 import io.socket.emitter.Emitter;
 
-import static com.penn.ppj.R.id.phone;
-
 /**
  * Created by penn on 29/05/2017.
  */
@@ -65,6 +63,7 @@ public class PPApplication extends Application {
     public static String BAIDU_AK_BROWSER = "BAIDU_AK_BROWSER";
     public static String SOCKET_URL = "SOCKET_URL";
 
+    public static final int REQUEST_VERIFY_CODE_INTERVAL = 5;
 
     private static String APP_NAME = "PPJ";
     private static final String LATEST_GEO = "LATEST_GEO";

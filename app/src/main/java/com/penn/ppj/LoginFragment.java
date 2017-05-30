@@ -76,7 +76,10 @@ public class LoginFragment extends Fragment {
             @Override
             public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
                 if (actionId == EditorInfo.IME_ACTION_DONE) {
-                    login();
+                    if (binding.loginButton.isEnabled()) {
+                        //如果登录按钮可用等同于点击登录按钮
+                        login();
+                    }
                     return true;
                 }
                 return false;
@@ -173,7 +176,9 @@ public class LoginFragment extends Fragment {
 
                             @Override
                             public void accept(@NonNull String s) throws Exception {
+                                //隐藏进度条
                                 PPApplication.hideProgressDialog();
+
                                 getActivity().finish();
                                 Intent intent = new Intent(getContext(), MainActivity.class);
                                 startActivity(intent);
@@ -185,6 +190,8 @@ public class LoginFragment extends Fragment {
                                 PPApplication.error(throwable.toString());
                                 //如有错误,登出以清理已经取得的信息
                                 PPApplication.logout();
+
+                                //隐藏进度条
                                 PPApplication.hideProgressDialog();
                             }
                         }
