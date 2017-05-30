@@ -17,6 +17,7 @@ import android.util.TypedValue;
 import android.widget.ImageView;
 import android.widget.Toast;
 
+import com.github.curioustechizen.ago.RelativeTimeTextView;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
@@ -24,6 +25,7 @@ import com.google.gson.JsonPrimitive;
 import com.penn.ppj.messageEvent.UserLoginEvent;
 import com.penn.ppj.messageEvent.UserLogoutEvent;
 import com.penn.ppj.model.realm.CurrentUser;
+import com.penn.ppj.model.realm.Message;
 import com.penn.ppj.model.realm.Moment;
 import com.penn.ppj.model.realm.Pic;
 import com.penn.ppj.model.realm.RelatedUser;
@@ -61,6 +63,8 @@ import io.socket.client.IO;
 import io.socket.client.Socket;
 import io.socket.emitter.Emitter;
 
+import static com.penn.ppj.R.string.moment;
+
 /**
  * Created by penn on 29/05/2017.
  */
@@ -74,6 +78,7 @@ public class PPApplication extends Application {
     public static String SOCKET_URL = "SOCKET_URL";
 
     public static final int DASHBOARD_MOMENT_PAGE_SIZE = 20;
+    public static final int MESSAGE_PAGE_SIZE = 20;
 
     public static final int REQUEST_VERIFY_CODE_INTERVAL = 5;
 
@@ -98,6 +103,18 @@ public class PPApplication extends Application {
     //-----helper-----
     public static Context getContext() {
         return appContext;
+    }
+
+    @BindingAdapter({"bind:ppReferenceTime"})
+    public static void setTimeAgo(final RelativeTimeTextView relativeTimeTextView, long time) {
+        if (time > 0) {
+            relativeTimeTextView.setReferenceTime(time);
+        }
+    }
+
+    @BindingAdapter({"bind:avatarImageUrl"})
+    public static void setAvatarImageViewResource(final ImageView imageView, String pic) {
+        setImageViewResource(imageView, pic, 80);
     }
 
     @BindingAdapter({"bind:imagePic180"})
@@ -311,7 +328,6 @@ public class PPApplication extends Application {
         removePrefItem(BAIDU_API_URL);
         removePrefItem(BAIDU_AK_BROWSER);
         removePrefItem(SOCKET_URL);
-        stopSocket();
 
         //发出已logout广播
         EventBus.getDefault().post(new UserLogoutEvent());
@@ -648,6 +664,129 @@ public class PPApplication extends Application {
                 );
     }
 
+    public static void getLatestMessages() {
+        long mostNewMessageCreateTime = 0;
+        try (Realm realm = Realm.getDefaultInstance()) {
+            RealmResults<Message> messages = realm.where(Message.class).findAllSorted("createTime", Sort.DESCENDING);
+            if (messages.size() > 0) {
+                mostNewMessageCreateTime = messages.get(0).getCreateTime();
+            }
+        }
+
+        PPJSONObject jBody = new PPJSONObject();
+        jBody
+                .put("after", mostNewMessageCreateTime)
+                .put("sort", "1");
+
+        final Observable<String> apiResult = PPRetrofit.getInstance().api("message.list", jBody.getJSONObject());
+
+        apiResult
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        new Consumer<String>() {
+                            @Override
+                            public void accept(@NonNull String s) throws Exception {
+                                PPWarn ppWarn = ppWarning(s);
+
+                                if (ppWarn != null) {
+                                    throw new Exception(ppWarn.msg);
+                                }
+
+                                int dataSize = 0;
+                                //parse and save messages
+                                try (Realm realm = Realm.getDefaultInstance()) {
+
+                                    CurrentUser currentUser = realm.where(CurrentUser.class).findFirst();
+
+                                    realm.beginTransaction();
+
+                                    try {
+                                        JsonArray ja = ppFromString(s, "data.list").getAsJsonArray();
+
+                                        dataSize = ja.size();
+
+                                        for (int i = 0; i < dataSize; i++) {
+                                            Message message = parseMessage(ppFromString(s, "data.list." + i).getAsJsonObject().toString(), currentUser.getNickname(), currentUser.getAvatar());
+
+                                            realm.insertOrUpdate(message);
+                                        }
+
+                                        realm.commitTransaction();
+                                    } catch (Exception e) {
+                                        realm.cancelTransaction();
+                                        throw new Exception(e.toString());
+                                    }
+
+                                    if (dataSize < MESSAGE_PAGE_SIZE) {
+                                        //do nothing
+                                    } else {
+                                        getLatestMessages();
+                                    }
+                                }
+                            }
+                        },
+                        new Consumer<Throwable>() {
+                            @Override
+                            public void accept(@NonNull Throwable throwable) throws Exception {
+                                error(throwable.toString());
+                            }
+                        }
+                );
+    }
+
+    private static Message parseMessage(String s, String currentUserNickname, String currentUserAvatar) {
+        Message message = new Message();
+        message.setId(ppFromString(s, "id").getAsString());
+        int type = ppFromString(s, "type").getAsInt();
+        message.setType(type);
+        message.setRead(ppFromString(s, "read").getAsInt() == 1 ? true : false);
+        message.setCreateTime(ppFromString(s, "createTime").getAsLong());
+        String content = "";
+
+        if (type == 1 || type == 6) {
+            message.setMomentId(ppFromString(s, "params.mid").getAsString());
+        }
+
+        //nickname, avatar, content
+        if (type == 1 || type == 6 || type == 8 || type == 9 || type == 10 || type == 11 || type == 15 || type == 16) {
+            message.setId(ppFromString(s, "id").getAsString());
+            message.setUserId(ppFromString(s, "params.targetUser.id").getAsString());
+            message.setNickname(ppFromString(s, "params.targetUser.nickname").getAsString());
+            message.setAvatar(ppFromString(s, "params.targetUser.head").getAsString());
+            message.setContent(TextUtils.isEmpty(content) ? PPApplication.getContext().getResources().getString(R.string.empty) : content);
+
+        } else {
+            Log.v("pplog", "未处理:" + type);
+            message.setNickname(currentUserNickname);
+            message.setAvatar(currentUserAvatar);
+            content = "未处理:" + s;
+            message.setContent(TextUtils.isEmpty(content) ? PPApplication.getContext().getResources().getString(R.string.empty) : content);
+            return message;
+        }
+
+        if (type == 6) {
+            content = message.getNickname() + PPApplication.getContext().getString(R.string.like_your_moment);
+        } else if (type == 1) {
+            content = message.getNickname() + PPApplication.getContext().getString(R.string.reply_your_moment);
+        } else if (type == 8) {
+            content = message.getNickname() + PPApplication.getContext().getString(R.string.follow_you_footprint);
+        } else if (type == 16) {
+            content = String.format(PPApplication.getContext().getString(R.string.you_sb_shoulder_meet), message.getNickname());
+        } else if (type == 10) {
+            content = String.format(PPApplication.getContext().getString(R.string.you_get_sb_mail), message.getNickname());
+        } else if (type == 15) {
+            content = String.format(PPApplication.getContext().getString(R.string.you_follow_sb_moment), message.getNickname());
+        } else if (type == 9) {
+            content = String.format(PPApplication.getContext().getString(R.string.you_and_sb_be_friend), message.getNickname());
+        } else if (type == 11) {
+            content = String.format(PPApplication.getContext().getString(R.string.get_sb_reply_mail), message.getNickname());
+        }
+
+        message.setContent(content);
+        return message;
+    }
+
     public static void getLatestMoments() {
         long mostNewMomentCreateTime = 0;
         try (Realm realm = Realm.getDefaultInstance()) {
@@ -838,7 +977,7 @@ public class PPApplication extends Application {
         socket.connect();
     }
 
-    private static void stopSocket() {
+    public static void stopSocket() {
         if (socket != null && socket.connected()) {
             socket.close();
         }

@@ -1,4 +1,29 @@
 <resources>
     <dimen name="fab_margin">16dp</dimen>
     <dimen name="icon_area">48dp</dimen>
+    <dimen name="common">16dp</dimen>
+
+    <!--pptodo need to redefine-->
+    <dimen name="activity_horizontal_margin">16dp</dimen>
+    <dimen name="activity_vertical_margin">16dp</dimen>
+    <dimen name="nav_header_vertical_spacing">16dp</dimen>
+    <dimen name="nav_header_height">160dp</dimen>
+
+    <dimen name="spacing_micro">4dp</dimen>
+
+    <dimen name="avatar_big">64dp</dimen>
+    <dimen name="avatar">48dp</dimen>
+    <dimen name="icon">32dp</dimen>
+    <dimen name="small">8dp</dimen>
+    <dimen name="fab">56dp</dimen>
+    <dimen name="comment_input_height">64dp</dimen>
+    <dimen name="button_height">48dp</dimen>
+
+    <dimen name="z_app_bar">4dp</dimen>
+    <dimen name="avatar_padding">4dp</dimen>
+    <dimen name="map_width">160dp</dimen>
+    <dimen name="map_height">90dp</dimen>
+    <dimen name="nav_bar_avatar_size">64dp</dimen>
+    <dimen name="avatar_super_big">120dp</dimen>
+    <dimen name="icon_size">48dp</dimen>
 </resources>

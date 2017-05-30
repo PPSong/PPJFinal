@@ -6,6 +6,7 @@ import android.os.Bundle;
 import android.support.design.widget.AppBarLayout;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
+import android.support.v4.app.Fragment;
 import android.support.v4.view.ViewPager;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
@@ -34,8 +35,6 @@ import io.realm.RealmChangeListener;
 import io.realm.RealmConfiguration;
 import io.realm.RealmModel;
 import io.realm.RealmObjectChangeListener;
-
-import static com.penn.ppj.R.id.fab;
 
 public class MainActivity extends AppCompatActivity {
     //变量
@@ -74,12 +73,12 @@ public class MainActivity extends AppCompatActivity {
     //EventBus
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void UserLoginEvent(UserLoginEvent event) {
-        setupForLoginUser();
+        onLogin();
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void UserLogoutEvent(UserLogoutEvent event) {
-        setupForGuest();
+        onLogout();
     }
 
     //帮助函数
@@ -114,8 +113,12 @@ public class MainActivity extends AppCompatActivity {
 
         //view pager
         PPPagerAdapter adapter = new PPPagerAdapter(getSupportFragmentManager());
-        NearbyFragment nearbyFragment = new NearbyFragment();
+        NearbyFragment nearbyFragment = NearbyFragment.newInstance();
+        DashboardFragment dashboardFragment = DashboardFragment.newInstance();
+        NotificationFragment notificationFragment = NotificationFragment.newInstance();
         adapter.addFragment(nearbyFragment, "C1");
+        adapter.addFragment(dashboardFragment, "C2");
+        adapter.addFragment(notificationFragment, "C3");
 
         binding.viewPager.setAdapter(adapter);
 
@@ -140,18 +143,13 @@ public class MainActivity extends AppCompatActivity {
         });
 
         if (PPApplication.isLogin()) {
-            setupForLoginUser();
+            onLogin();
+            //更新相关用户
             refreshRelatedUsers();
-        } else {
-            setupForGuest();
         }
     }
 
-    private void setupForGuest() {
-        binding.setData(null);
-    }
-
-    private void setupForLoginUser() {
+    private void onLogin() {
         //开启socket
         try {
             PPApplication.startSocket();
@@ -161,8 +159,6 @@ public class MainActivity extends AppCompatActivity {
 
         //初始化realm
         PPApplication.initRealm(PPApplication.getPrefStringValue(PPApplication.CUR_USER_ID, ""));
-
-        //初始化currentUser
         realm = Realm.getDefaultInstance();
 
         //先取得本地数据库中的CurrentUser
@@ -179,6 +175,20 @@ public class MainActivity extends AppCompatActivity {
 
         //取得最新Current
         PPApplication.refreshCurrentUser();
+    }
+
+    private void onLogout() {
+        //关闭socket
+        PPApplication.stopSocket();
+
+        //关闭realm
+        realm.close();
+
+        //清空binding data
+        binding.setData(null);
+
+        //设置CurrentUser动态更新
+        currentUser.removeAllChangeListeners();
     }
 
     //refresh RelatedUsers

@@ -5,7 +5,6 @@ import android.graphics.BitmapFactory;
 
 import com.penn.ppj.PPApplication;
 import com.penn.ppj.ppEnum.PicStatus;
-import com.penn.ppj.util.PPHelper;
 
 import java.io.ByteArrayOutputStream;
 

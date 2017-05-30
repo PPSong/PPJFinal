@@ -11,7 +11,7 @@ import io.realm.annotations.PrimaryKey;
 
 public class RelatedUser extends RealmObject {
     @PrimaryKey
-    private String key;
+    private String key; //userId + "_" + type
     private String userId;
     private String type;
     private long createTime;

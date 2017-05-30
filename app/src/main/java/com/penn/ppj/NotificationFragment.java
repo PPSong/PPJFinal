@@ -4,27 +4,20 @@ import android.databinding.DataBindingUtil;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
 import android.support.v7.widget.GridLayoutManager;
+import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
-import com.google.gson.JsonArray;
 import com.penn.ppj.databinding.FragmentDashboardBinding;
-import com.penn.ppj.databinding.FragmentNearbyBinding;
+import com.penn.ppj.databinding.FragmentNotificationBinding;
+import com.penn.ppj.databinding.MessageCellBinding;
 import com.penn.ppj.databinding.MomentOverviewCellBinding;
-import com.penn.ppj.databinding.NearbyMomentOverviewCellBinding;
 import com.penn.ppj.messageEvent.UserLoginEvent;
 import com.penn.ppj.messageEvent.UserLogoutEvent;
-import com.penn.ppj.model.realm.CurrentUser;
+import com.penn.ppj.model.realm.Message;
 import com.penn.ppj.model.realm.Moment;
-import com.penn.ppj.model.realm.NearbyMoment;
-import com.penn.ppj.util.PPJSONObject;
-import com.penn.ppj.util.PPLoadController;
-import com.penn.ppj.util.PPLoadDataAdapter;
-import com.penn.ppj.util.PPRetrofit;
-import com.penn.ppj.util.PPWarn;
 
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
@@ -32,71 +25,53 @@ import org.greenrobot.eventbus.ThreadMode;
 
 import java.util.List;
 
-import io.reactivex.Observable;
-import io.reactivex.android.schedulers.AndroidSchedulers;
-import io.reactivex.annotations.NonNull;
-import io.reactivex.functions.Action;
-import io.reactivex.functions.Consumer;
-import io.reactivex.schedulers.Schedulers;
-import io.realm.ObjectChangeSet;
 import io.realm.OrderedCollectionChangeSet;
 import io.realm.OrderedRealmCollectionChangeListener;
 import io.realm.Realm;
-import io.realm.RealmChangeListener;
-import io.realm.RealmConfiguration;
-import io.realm.RealmModel;
-import io.realm.RealmObjectChangeListener;
 import io.realm.RealmResults;
 import io.realm.Sort;
 
-import static com.penn.ppj.NearbyFragment.NEARBY_MOMENT_PAGE_SIZE;
-import static com.penn.ppj.PPApplication.refreshRelatedUsers;
-
-public class DashboardFragment extends Fragment {
+public class NotificationFragment extends Fragment {
     //变量
-    private FragmentDashboardBinding binding;
+    private FragmentNotificationBinding binding;
     private Realm realm;
-    private RealmResults<Moment> moments;
+    private RealmResults<Message> messages;
     private PPAdapter ppAdapter;
-    private GridLayoutManager gridLayoutManager;
+    private LinearLayoutManager linearLayoutManager;
 
     private class PPAdapter extends RecyclerView.Adapter<PPAdapter.PPHoldView> {
-        private List<Moment> data;
+        private List<Message> data;
 
         public class PPHoldView extends RecyclerView.ViewHolder {
-            private MomentOverviewCellBinding binding;
+            private MessageCellBinding binding;
 
-            public PPHoldView(MomentOverviewCellBinding binding) {
+            public PPHoldView(MessageCellBinding binding) {
                 super(binding.getRoot());
                 this.binding = binding;
             }
         }
 
-        public PPAdapter(List<Moment> data) {
+        public PPAdapter(List<Message> data) {
             this.data = data;
         }
 
         @Override
         public PPAdapter.PPHoldView onCreateViewHolder(ViewGroup parent, int viewType) {
-            MomentOverviewCellBinding momentOverviewCellBinding = MomentOverviewCellBinding.inflate(LayoutInflater.from(parent.getContext()), parent, false);
+            MessageCellBinding messageCellBinding = MessageCellBinding.inflate(LayoutInflater.from(parent.getContext()), parent, false);
 
-            momentOverviewCellBinding.getRoot().setOnClickListener(new View.OnClickListener() {
+            messageCellBinding.getRoot().setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
 
                 }
             });
 
-            return new PPHoldView(momentOverviewCellBinding);
+            return new PPHoldView(messageCellBinding);
         }
 
         @Override
         public void onBindViewHolder(PPAdapter.PPHoldView holder, int position) {
-            //清空当前图片
-            holder.binding.mainImageView.setImageResource(0);
-            //设置图片背景色
-            holder.binding.mainImageView.setBackgroundColor(PPApplication.getMomentOverviewBackgroundColor(position));
-            //设置NearbyMoment binding数据
+            //设置Message binding数据
             holder.binding.setData(data.get(position));
         }
 
@@ -107,12 +82,12 @@ public class DashboardFragment extends Fragment {
     }
 
     //构造函数
-    public DashboardFragment() {
+    public NotificationFragment() {
         // Required empty public constructor
     }
 
-    public static DashboardFragment newInstance() {
-        DashboardFragment fragment = new DashboardFragment();
+    public static NotificationFragment newInstance() {
+        NotificationFragment fragment = new NotificationFragment();
 
         return fragment;
     }
@@ -127,7 +102,7 @@ public class DashboardFragment extends Fragment {
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         // Inflate the layout for this fragment
-        binding = DataBindingUtil.inflate(inflater, R.layout.fragment_dashboard, container, false);
+        binding = DataBindingUtil.inflate(inflater, R.layout.fragment_notification, container, false);
 
         setup();
 
@@ -166,13 +141,13 @@ public class DashboardFragment extends Fragment {
     //帮助函数
     private void onLogout() {
         //清空moments
-        moments.removeAllChangeListeners();
-        moments = null;
+        messages.removeAllChangeListeners();
+        messages = null;
 
         //清空ppAdapter
         ppAdapter = null;
         //清空gridLayoutManager
-        gridLayoutManager = null;
+        linearLayoutManager = null;
 
         binding.recyclerView.setAdapter(null);
         binding.recyclerView.setLayoutManager(null);
@@ -186,11 +161,11 @@ public class DashboardFragment extends Fragment {
         realm = Realm.getDefaultInstance();
 
         //先取得本地数据库中的moments
-        moments = realm.where(Moment.class).notEqualTo("deleted", true).findAllSorted("createTime", Sort.DESCENDING);;
+        messages = realm.where(Message.class).findAllSorted("createTime", Sort.DESCENDING);;
         //设置moments动态更新
-        moments.addChangeListener(new OrderedRealmCollectionChangeListener<RealmResults<Moment>>() {
+        messages.addChangeListener(new OrderedRealmCollectionChangeListener<RealmResults<Message>>() {
             @Override
-            public void onChange(RealmResults<Moment> collection, OrderedCollectionChangeSet changeSet) {
+            public void onChange(RealmResults<Message> collection, OrderedCollectionChangeSet changeSet) {
                 if (changeSet == null) {
                     ppAdapter.notifyDataSetChanged();
                     return;
@@ -215,14 +190,14 @@ public class DashboardFragment extends Fragment {
         });
 
         //ppAdapter
-        ppAdapter = new PPAdapter(moments);
-        //gridLayoutManager
-        gridLayoutManager = new GridLayoutManager(getContext(), PPApplication.calculateNoOfColumns());
+        ppAdapter = new PPAdapter(messages);
+        //linearLayoutManager
+        linearLayoutManager = new LinearLayoutManager(getContext());
         binding.recyclerView.setAdapter(ppAdapter);
-        binding.recyclerView.setLayoutManager(gridLayoutManager);
+        binding.recyclerView.setLayoutManager(linearLayoutManager);
 
-        //取得最新moments
-        PPApplication.getLatestMoments();
+        //取得最新messages
+        PPApplication.getLatestMessages();
     }
 
     private void setup() {
