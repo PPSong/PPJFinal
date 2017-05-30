@@ -147,6 +147,10 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private void setupForGuest() {
+        binding.setData(null);
+    }
+
     private void setupForLoginUser() {
         //开启socket
         try {
@@ -195,10 +199,5 @@ public class MainActivity extends AppCompatActivity {
                             }
                         }
                 );
-    }
-
-
-    private void setupForGuest() {
-        binding.setData(null);
     }
 }

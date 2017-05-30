@@ -151,7 +151,9 @@ public class NearbyFragment extends Fragment {
 
     @Override
     public void onDestroyView() {
-        realm.close();
+        if (realm != null && !realm.isClosed()) {
+            realm.close();
+        }
         super.onDestroyView();
     }
 

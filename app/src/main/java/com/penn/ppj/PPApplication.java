@@ -24,7 +24,10 @@ import com.google.gson.JsonPrimitive;
 import com.penn.ppj.messageEvent.UserLoginEvent;
 import com.penn.ppj.messageEvent.UserLogoutEvent;
 import com.penn.ppj.model.realm.CurrentUser;
+import com.penn.ppj.model.realm.Moment;
+import com.penn.ppj.model.realm.Pic;
 import com.penn.ppj.model.realm.RelatedUser;
+import com.penn.ppj.ppEnum.MomentStatus;
 import com.penn.ppj.ppEnum.PPValueType;
 import com.penn.ppj.ppEnum.PicStatus;
 import com.penn.ppj.ppEnum.RelatedUserType;
@@ -43,6 +46,7 @@ import java.util.regex.Pattern;
 import es.dmoral.toasty.Toasty;
 import io.reactivex.Observable;
 import io.reactivex.ObservableSource;
+import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.annotations.NonNull;
 import io.reactivex.functions.BiFunction;
 import io.reactivex.functions.Consumer;
@@ -51,6 +55,8 @@ import io.reactivex.functions.Function3;
 import io.reactivex.schedulers.Schedulers;
 import io.realm.Realm;
 import io.realm.RealmConfiguration;
+import io.realm.RealmResults;
+import io.realm.Sort;
 import io.socket.client.IO;
 import io.socket.client.Socket;
 import io.socket.emitter.Emitter;
@@ -66,6 +72,8 @@ public class PPApplication extends Application {
     public static String BAIDU_API_URL = "BAIDU_API_URL";
     public static String BAIDU_AK_BROWSER = "BAIDU_AK_BROWSER";
     public static String SOCKET_URL = "SOCKET_URL";
+
+    public static final int DASHBOARD_MOMENT_PAGE_SIZE = 20;
 
     public static final int REQUEST_VERIFY_CODE_INTERVAL = 5;
 
@@ -90,6 +98,17 @@ public class PPApplication extends Application {
     //-----helper-----
     public static Context getContext() {
         return appContext;
+    }
+
+    @BindingAdapter({"bind:imagePic180"})
+    public static void imagePic180(final ImageView imageView, Pic pic) {
+        if (pic.getStatus() == PicStatus.NET) {
+            setImageViewResource(imageView, pic.getKey(), 180);
+        } else {
+            byte[] data = pic.getThumbLocalData();
+            Bitmap bmp = BitmapFactory.decodeByteArray(data, 0, data.length);
+            imageView.setImageBitmap(bmp);
+        }
     }
 
     @BindingAdapter({"bind:image180"})
@@ -627,6 +646,110 @@ public class PPApplication extends Application {
                             }
                         }
                 );
+    }
+
+    public static void getLatestMoments() {
+        long mostNewMomentCreateTime = 0;
+        try (Realm realm = Realm.getDefaultInstance()) {
+            RealmResults<Moment> moments = realm.where(Moment.class).findAllSorted("createTime", Sort.DESCENDING);
+            if (moments.size() > 0) {
+                mostNewMomentCreateTime = moments.get(0).getCreateTime();
+            }
+        }
+
+        PPJSONObject jBody = new PPJSONObject();
+        jBody
+                .put("after", mostNewMomentCreateTime)
+                .put("sort", "1");
+
+        final Observable<String> apiResult = PPRetrofit.getInstance().api("timeline.mine", jBody.getJSONObject());
+
+        apiResult
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        new Consumer<String>() {
+                            @Override
+                            public void accept(@NonNull String s) throws Exception {
+                                PPWarn ppWarn = ppWarning(s);
+
+                                if (ppWarn != null) {
+                                    throw new Exception(ppWarn.msg);
+                                }
+
+                                int dataSize = 0;
+                                //parse and save moments
+                                try (Realm realm = Realm.getDefaultInstance()) {
+
+                                    realm.beginTransaction();
+
+                                    try {
+                                        JsonArray ja = ppFromString(s, "data.timeline").getAsJsonArray();
+
+                                        dataSize = ja.size();
+
+                                        for (int i = 0; i < dataSize; i++) {
+                                            long createTime = ppFromString(s, "data.timeline." + i + "._info.createTime").getAsLong();
+
+                                            Moment moment = new Moment();
+                                            moment.setKey(createTime + "_" + ppFromString(s, "data.timeline." + i + "._info._creator.id").getAsString());
+                                            moment.setId(ppFromString(s, "data.timeline." + i + ".id").getAsString());
+                                            moment.setUserId(ppFromString(s, "data.timeline." + i + "._info._creator.id").getAsString());
+                                            moment.setCreateTime(createTime);
+                                            moment.setStatus(MomentStatus.NET);
+                                            moment.setAvatar(ppFromString(s, "data.timeline." + i + "._info._creator.head").getAsString());
+
+                                            Pic pic = new Pic();
+                                            pic.setKey(ppFromString(s, "data.timeline." + i + "._info.pics.0").getAsString());
+                                            pic.setStatus(PicStatus.NET);
+                                            moment.setPic(pic);
+
+                                            realm.insertOrUpdate(moment);
+                                        }
+
+                                        realm.commitTransaction();
+                                    } catch (Exception e) {
+                                        realm.cancelTransaction();
+                                        throw new Exception(e.toString());
+                                    }
+
+                                    if (dataSize < DASHBOARD_MOMENT_PAGE_SIZE) {
+                                        //do nothing
+                                    } else {
+                                        getLatestMoments();
+                                    }
+                                }
+                            }
+                        },
+                        new Consumer<Throwable>() {
+                            @Override
+                            public void accept(@NonNull Throwable throwable) throws Exception {
+                                error(throwable.toString());
+                            }
+                        }
+                );
+    }
+
+    //resize bitmap
+    public static Bitmap resize(Bitmap image, int maxWidth, int maxHeight) {
+        if (maxHeight > 0 && maxWidth > 0) {
+            int width = image.getWidth();
+            int height = image.getHeight();
+            float ratioBitmap = (float) width / (float) height;
+            float ratioMax = (float) maxWidth / (float) maxHeight;
+
+            int finalWidth = maxWidth;
+            int finalHeight = maxHeight;
+            if (ratioMax > 1) {
+                finalWidth = (int) ((float) maxHeight * ratioBitmap);
+            } else {
+                finalHeight = (int) ((float) maxWidth / ratioBitmap);
+            }
+            image = Bitmap.createScaledBitmap(image, finalWidth, finalHeight, true);
+            return image;
+        } else {
+            return image;
+        }
     }
 
     //------------------------------private------------------------------
