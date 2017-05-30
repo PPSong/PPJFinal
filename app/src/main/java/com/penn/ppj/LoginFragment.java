@@ -20,6 +20,9 @@ import com.jakewharton.rxbinding2.view.RxView;
 import com.jakewharton.rxbinding2.widget.RxTextView;
 import com.penn.ppj.databinding.ActivityLoginBinding;
 import com.penn.ppj.databinding.FragmentLoginBinding;
+import com.penn.ppj.messageEvent.UserLoginEvent;
+
+import org.greenrobot.eventbus.EventBus;
 
 import java.util.concurrent.TimeUnit;
 
@@ -178,6 +181,9 @@ public class LoginFragment extends Fragment {
                             public void accept(@NonNull String s) throws Exception {
                                 //隐藏进度条
                                 PPApplication.hideProgressDialog();
+
+                                //发出已login广播
+                                EventBus.getDefault().post(new UserLoginEvent());
 
                                 getActivity().finish();
                                 Intent intent = new Intent(getContext(), MainActivity.class);

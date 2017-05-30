@@ -322,38 +322,43 @@ public class NearbyFragment extends Fragment {
         try (Realm realm = Realm.getInstance(realmDefaultConfig)) {
             realm.beginTransaction();
 
-            if (refresh) {
-                realm.where(NearbyMoment.class).findAll().deleteAllFromRealm();
-            }
-
-            JsonArray ja = PPApplication.ppFromString(s, "data.list").getAsJsonArray();
-
-            int size = ja.size();
-
-            for (int i = 0; i < size; i++) {
-                long createTime = PPApplication.ppFromString(s, "data.list." + i + ".createTime").getAsLong();
-
-                //注意,由于api会返回重复的数据,如果用以下排重的做法的话,会导致闪屏,因为一次加载不能满足一屏,又会触发load more
-                NearbyMoment nearbyMoment = realm.where(NearbyMoment.class).equalTo("key", createTime + "_" + PPApplication.ppFromString(s, "data.list." + i + "._creator.id").getAsString()).findFirst();
-                if (nearbyMoment == null) {
-                    nearbyMoment = new NearbyMoment();
-                    nearbyMoment.setKey(createTime + "_" + PPApplication.ppFromString(s, "data.list." + i + "._creator.id").getAsString());
-                    nearbyMoment.setId(PPApplication.ppFromString(s, "data.list." + i + "._id").getAsString());
-                    nearbyMoment.setCreateTime(createTime);
-                    nearbyMoment.setPic(PPApplication.ppFromString(s, "data.list." + i + ".pics.0").getAsString());
-
-                    realm.insert(nearbyMoment);
-
-                    if (earliestCreateTime > createTime) {
-                        //更新最老记录时间戳
-                        earliestCreateTime = createTime;
-                    }
-                } else {
-                    //do nothing
+            try {
+                if (refresh) {
+                    realm.where(NearbyMoment.class).findAll().deleteAllFromRealm();
                 }
-            }
 
-            realm.commitTransaction();
+                JsonArray ja = PPApplication.ppFromString(s, "data.list").getAsJsonArray();
+
+                int size = ja.size();
+
+                for (int i = 0; i < size; i++) {
+                    long createTime = PPApplication.ppFromString(s, "data.list." + i + ".createTime").getAsLong();
+
+                    //注意,由于api会返回重复的数据,如果用以下排重的做法的话,会导致闪屏,因为一次加载不能满足一屏,又会触发load more
+                    NearbyMoment nearbyMoment = realm.where(NearbyMoment.class).equalTo("key", createTime + "_" + PPApplication.ppFromString(s, "data.list." + i + "._creator.id").getAsString()).findFirst();
+                    if (nearbyMoment == null) {
+                        nearbyMoment = new NearbyMoment();
+                        nearbyMoment.setKey(createTime + "_" + PPApplication.ppFromString(s, "data.list." + i + "._creator.id").getAsString());
+                        nearbyMoment.setId(PPApplication.ppFromString(s, "data.list." + i + "._id").getAsString());
+                        nearbyMoment.setCreateTime(createTime);
+                        nearbyMoment.setPic(PPApplication.ppFromString(s, "data.list." + i + ".pics.0").getAsString());
+
+                        realm.insert(nearbyMoment);
+
+                        if (earliestCreateTime > createTime) {
+                            //更新最老记录时间戳
+                            earliestCreateTime = createTime;
+                        }
+                    } else {
+                        //do nothing
+                    }
+                }
+
+                realm.commitTransaction();
+            } catch (Exception e) {
+                PPApplication.error(e.toString());
+                realm.cancelTransaction();
+            }
         }
     }
 }

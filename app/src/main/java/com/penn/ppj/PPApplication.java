@@ -24,8 +24,10 @@ import com.google.gson.JsonPrimitive;
 import com.penn.ppj.messageEvent.UserLoginEvent;
 import com.penn.ppj.messageEvent.UserLogoutEvent;
 import com.penn.ppj.model.realm.CurrentUser;
+import com.penn.ppj.model.realm.RelatedUser;
 import com.penn.ppj.ppEnum.PPValueType;
 import com.penn.ppj.ppEnum.PicStatus;
+import com.penn.ppj.ppEnum.RelatedUserType;
 import com.penn.ppj.util.PPJSONObject;
 import com.penn.ppj.util.PPRetrofit;
 import com.penn.ppj.util.PPWarn;
@@ -35,6 +37,7 @@ import org.greenrobot.eventbus.EventBus;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.concurrent.ExecutionException;
 import java.util.regex.Pattern;
 
 import es.dmoral.toasty.Toasty;
@@ -44,6 +47,7 @@ import io.reactivex.annotations.NonNull;
 import io.reactivex.functions.BiFunction;
 import io.reactivex.functions.Consumer;
 import io.reactivex.functions.Function;
+import io.reactivex.functions.Function3;
 import io.reactivex.schedulers.Schedulers;
 import io.realm.Realm;
 import io.realm.RealmConfiguration;
@@ -333,29 +337,31 @@ public class PPApplication extends Application {
 
                             realm.beginTransaction();
 
-                            if (currentUser == null) {
-                                currentUser = new CurrentUser();
-                                currentUser.setUserId(userId);
+                            try {
+                                if (currentUser == null) {
+                                    currentUser = new CurrentUser();
+                                    currentUser.setUserId(userId);
+                                }
+
+                                realm.insertOrUpdate(currentUser);
+
+                                realm.commitTransaction();
+                            } catch (Exception e) {
+                                error(e.toString());
+                                realm.cancelTransaction();
                             }
-
-                            realm.insertOrUpdate(currentUser);
-
-                            realm.commitTransaction();
                         }
 
                         return PPRetrofit.getInstance().api("user.startup", null);
                     }
                 })
-                .map(new Function<String, String>() {
+                .flatMap(new Function<String, ObservableSource<String>>() {
                     @Override
-                    public String apply(@NonNull String s) throws Exception {
+                    public ObservableSource<String> apply(@NonNull String s) throws Exception {
                         PPWarn ppWarn = ppWarning(s);
                         if (ppWarn != null) {
                             throw new Exception(ppWarn.msg);
                         }
-
-                        Log.v("pplog", "s:" + s);
-                        Log.v("pplog", "SOCKET_URL:" + ppFromString(s, "data.settings.socket.host").getAsString() + ":" + ppFromString(s, "data.settings.socket.port").getAsInt());
 
                         //设置登录用户相关preference
                         setPrefStringValue(BAIDU_AK_BROWSER, ppFromString(s, "data.settings.geo.ak_browser").getAsString());
@@ -366,23 +372,23 @@ public class PPApplication extends Application {
                         try (Realm realm = Realm.getDefaultInstance()) {
                             realm.beginTransaction();
 
-                            CurrentUser currentUser = realm.where(CurrentUser.class)
-                                    .findFirst();
+                            try {
+                                CurrentUser currentUser = realm.where(CurrentUser.class)
+                                        .findFirst();
 
-                            currentUser.setNickname(ppFromString(s, "data.userInfo.nickname").getAsString());
-                            currentUser.setSex(ppFromString(s, "data.userInfo.gender").getAsInt());
-                            currentUser.setBirthday(ppFromString(s, "data.userInfo.birthday").getAsLong());
-                            currentUser.setAvatar(ppFromString(s, "data.userInfo.head", PPValueType.STRING).getAsString());
+                                currentUser.setNickname(ppFromString(s, "data.userInfo.nickname").getAsString());
+                                currentUser.setSex(ppFromString(s, "data.userInfo.gender").getAsInt());
+                                currentUser.setBirthday(ppFromString(s, "data.userInfo.birthday").getAsLong());
+                                currentUser.setAvatar(ppFromString(s, "data.userInfo.head", PPValueType.STRING).getAsString());
 
-                            realm.commitTransaction();
+                                realm.commitTransaction();
+                            } catch (Exception e) {
+                                error(e.toString());
+                                realm.cancelTransaction();
+                            }
                         }
 
-                        //开启socket singleton
-                        startSocket();
-
-                        //发出已login广播
-                        EventBus.getDefault().post(new UserLoginEvent());
-                        return "OK";
+                        return refreshRelatedUsers();
                     }
                 });
     }
@@ -443,12 +449,17 @@ public class PPApplication extends Application {
                                     CurrentUser currentUser = realm.where(CurrentUser.class).findFirst();
                                     realm.beginTransaction();
 
-                                    currentUser.setNickname(ppFromString(s, "data.userInfo.nickname").getAsString());
-                                    currentUser.setSex(ppFromString(s, "data.userInfo.gender").getAsInt());
-                                    currentUser.setBirthday(ppFromString(s, "data.userInfo.birthday").getAsLong());
-                                    currentUser.setAvatar(ppFromString(s, "data.userInfo.head", PPValueType.STRING).getAsString());
+                                    try {
+                                        currentUser.setNickname(ppFromString(s, "data.userInfo.nickname").getAsString());
+                                        currentUser.setSex(ppFromString(s, "data.userInfo.gender").getAsInt());
+                                        currentUser.setBirthday(ppFromString(s, "data.userInfo.birthday").getAsLong());
+                                        currentUser.setAvatar(ppFromString(s, "data.userInfo.head", PPValueType.STRING).getAsString());
 
-                                    realm.commitTransaction();
+                                        realm.commitTransaction();
+                                    } catch (Exception e) {
+                                        error(e.toString());
+                                        realm.cancelTransaction();
+                                    }
                                 }
                             }
                         },
@@ -508,6 +519,116 @@ public class PPApplication extends Application {
 
         return error;
     }
+
+    //刷新我的fans
+    public static Observable<String> refreshFans() {
+        PPJSONObject jBody = new PPJSONObject();
+        jBody
+                .put("before", "0");
+
+        return PPRetrofit.getInstance()
+                .api("friend.myFans", jBody.getJSONObject());
+    }
+
+    //刷新我的follows
+    public static Observable<String> refreshFollows() {
+        PPJSONObject jBody = new PPJSONObject();
+        jBody
+                .put("before", "0");
+
+        return PPRetrofit.getInstance()
+                .api("friend.myFollows", jBody.getJSONObject());
+    }
+
+    //刷新我的friends
+    public static Observable<String> refreshFriends() {
+        PPJSONObject jBody = new PPJSONObject();
+        jBody
+                .put("needInfo", "1");
+
+        return PPRetrofit.getInstance()
+                .api("friend.mine", jBody.getJSONObject());
+    }
+
+    //解析保存fans, follows, friends
+    public static void parseAndSaveToLocalDB(String s, RelatedUserType relatedUserType) throws Exception {
+        PPWarn ppWarn = ppWarning(s);
+        if (ppWarn != null) {
+            throw new Exception(ppWarn.msg);
+        }
+
+        try (Realm realm = Realm.getDefaultInstance()) {
+            realm.beginTransaction();
+            long now = System.currentTimeMillis();
+
+            try {
+                if (relatedUserType == RelatedUserType.FRIEND) {
+                    //friends
+                    JsonArray ja = ppFromString(s, "data.list").getAsJsonArray();
+
+                    for (int i = 0; i < ja.size(); i++) {
+                        RelatedUser relatedUser = new RelatedUser();
+                        relatedUser.setType(RelatedUserType.FRIEND);
+                        relatedUser.setUserId(ppFromString(s, "data.list." + i + ".id").getAsString());
+                        relatedUser.setKey();
+                        relatedUser.setNickname(ppFromString(s, "data.list." + i + ".nickname").getAsString());
+                        relatedUser.setAvatar(ppFromString(s, "data.list." + i + ".head").getAsString());
+                        relatedUser.setCreateTime(ppFromString(s, "data.list." + i + ".time").getAsLong());
+                        relatedUser.setLastVisitTime(now);
+
+                        realm.insertOrUpdate(relatedUser);
+                    }
+                } else {
+                    //fans, follows
+                    JsonArray ja = ppFromString(s, "data").getAsJsonArray();
+
+                    for (int i = 0; i < ja.size(); i++) {
+                        RelatedUser relatedUser = new RelatedUser();
+                        relatedUser.setType(relatedUserType);
+                        relatedUser.setUserId(ppFromString(s, "data." + i + ".id").getAsString());
+                        relatedUser.setKey();
+                        relatedUser.setNickname(ppFromString(s, "data." + i + ".nickname").getAsString());
+                        relatedUser.setAvatar(ppFromString(s, "data." + i + ".head").getAsString());
+                        relatedUser.setCreateTime(ppFromString(s, "data." + i + ".time").getAsLong());
+                        relatedUser.setLastVisitTime(now);
+
+                        realm.insertOrUpdate(relatedUser);
+                    }
+                }
+
+                //把服务器上已删除的user从本地删掉
+                realm.where(RelatedUser.class).equalTo("type", relatedUserType.toString()).notEqualTo("lastVisitTime", now).findAll().deleteAllFromRealm();
+
+                realm.commitTransaction();
+
+            } catch (Exception e) {
+                realm.cancelTransaction();
+                throw new Exception(e.toString());
+            }
+        }
+    }
+
+    //同时刷新follows,fans,friends
+    public static Observable<String> refreshRelatedUsers() {
+        return Observable
+                .zip(
+                        refreshFans(),
+                        refreshFollows(),
+                        refreshFriends(),
+                        new Function3<String, String, String, String>() {
+
+                            @Override
+                            public String apply(@NonNull String s, @NonNull String s2, @NonNull String s3) throws Exception {
+                                parseAndSaveToLocalDB(s, RelatedUserType.FAN);
+                                parseAndSaveToLocalDB(s2, RelatedUserType.FOLLOW);
+                                parseAndSaveToLocalDB(s3, RelatedUserType.FRIEND);
+
+                                return "OK";
+                            }
+                        }
+                );
+    }
+
     //------------------------------private------------------------------
     //设置DefaultConfiguration for 登录用户
     public static void initRealm(String userId) {

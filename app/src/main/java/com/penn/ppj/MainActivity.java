@@ -25,6 +25,9 @@ import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
 
 import de.jonasrottmann.realmbrowser.RealmBrowser;
+import io.reactivex.annotations.NonNull;
+import io.reactivex.functions.Consumer;
+import io.reactivex.schedulers.Schedulers;
 import io.realm.ObjectChangeSet;
 import io.realm.Realm;
 import io.realm.RealmChangeListener;
@@ -137,23 +140,24 @@ public class MainActivity extends AppCompatActivity {
         });
 
         if (PPApplication.isLogin()) {
-            //开启socket
-            try {
-                PPApplication.startSocket();
-            } catch (Exception e) {
-                PPApplication.error(e.toString());
-            }
-
-            //初始化realm
-            PPApplication.initRealm(PPApplication.getPrefStringValue(PPApplication.CUR_USER_ID, ""));
-
             setupForLoginUser();
+            refreshRelatedUsers();
         } else {
             setupForGuest();
         }
     }
 
     private void setupForLoginUser() {
+        //开启socket
+        try {
+            PPApplication.startSocket();
+        } catch (Exception e) {
+            PPApplication.error(e.toString());
+        }
+
+        //初始化realm
+        PPApplication.initRealm(PPApplication.getPrefStringValue(PPApplication.CUR_USER_ID, ""));
+
         //初始化currentUser
         realm = Realm.getDefaultInstance();
 
@@ -172,6 +176,27 @@ public class MainActivity extends AppCompatActivity {
         //取得最新Current
         PPApplication.refreshCurrentUser();
     }
+
+    //refresh RelatedUsers
+    private void refreshRelatedUsers() {
+        PPApplication.refreshRelatedUsers()
+                .subscribeOn(Schedulers.io())
+                .subscribe(
+                        new Consumer<String>() {
+                            @Override
+                            public void accept(@NonNull String s) throws Exception {
+
+                            }
+                        },
+                        new Consumer<Throwable>() {
+                            @Override
+                            public void accept(@NonNull Throwable throwable) throws Exception {
+                                PPApplication.error(throwable.toString());
+                            }
+                        }
+                );
+    }
+
 
     private void setupForGuest() {
         binding.setData(null);
