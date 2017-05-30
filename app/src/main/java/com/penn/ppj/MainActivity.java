@@ -16,6 +16,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 
 import com.penn.ppj.databinding.ActivityMainBinding;
+import com.penn.ppj.messageEvent.NotificationEvent;
 import com.penn.ppj.messageEvent.UserLoginEvent;
 import com.penn.ppj.messageEvent.UserLogoutEvent;
 import com.penn.ppj.model.realm.CurrentUser;
@@ -81,12 +82,27 @@ public class MainActivity extends AppCompatActivity {
         onLogout();
     }
 
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void NotificationEvent(NotificationEvent event) {
+        setBadge(event.num);
+    }
+
     //帮助函数
     public void showDb(View v) {
         Realm realm = Realm.getDefaultInstance();
         RealmConfiguration configuration = realm.getConfiguration();
         realm.close();
         RealmBrowser.startRealmModelsActivity(this, configuration);
+    }
+
+    //设置消息未读数
+    private void setBadge(int num) {
+        if (num > 0) {
+            binding.badge.setVisibility(View.VISIBLE);
+            binding.badge.setText("" + num);
+        } else {
+            binding.badge.setVisibility(View.INVISIBLE);
+        }
     }
 
     private void setup() {
@@ -124,6 +140,28 @@ public class MainActivity extends AppCompatActivity {
 
         //有几个tab就设几防止page自己重新刷新
         binding.viewPager.setOffscreenPageLimit(3);
+
+        //设置导航按钮
+        binding.goNearby.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                binding.viewPager.setCurrentItem(0, true);
+            }
+        });
+
+        binding.goDashboard.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                binding.viewPager.setCurrentItem(1, true);
+            }
+        });
+
+        binding.goNotification.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                binding.viewPager.setCurrentItem(2, true);
+            }
+        });
 
         binding.viewPager.addOnPageChangeListener(new ViewPager.OnPageChangeListener() {
             @Override

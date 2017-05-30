@@ -14,6 +14,7 @@ import com.penn.ppj.databinding.FragmentDashboardBinding;
 import com.penn.ppj.databinding.FragmentNotificationBinding;
 import com.penn.ppj.databinding.MessageCellBinding;
 import com.penn.ppj.databinding.MomentOverviewCellBinding;
+import com.penn.ppj.messageEvent.NotificationEvent;
 import com.penn.ppj.messageEvent.UserLoginEvent;
 import com.penn.ppj.messageEvent.UserLogoutEvent;
 import com.penn.ppj.model.realm.Message;
@@ -36,6 +37,7 @@ public class NotificationFragment extends Fragment {
     private FragmentNotificationBinding binding;
     private Realm realm;
     private RealmResults<Message> messages;
+    private RealmResults<Message> unReadMessages;
     private PPAdapter ppAdapter;
     private LinearLayoutManager linearLayoutManager;
 
@@ -62,7 +64,17 @@ public class NotificationFragment extends Fragment {
             messageCellBinding.getRoot().setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
+                    int position = binding.recyclerView.getChildAdapterPosition(v);
+                    Message message = data.get(position);
+                    //markLocalMessageRead
+                    try (Realm realm = Realm.getDefaultInstance()) {
+                        realm.beginTransaction();
 
+                        Message tmpMessage = realm.where(Message.class).equalTo("id", message.getId()).findFirst();
+                        tmpMessage.setRead(true);
+
+                        realm.commitTransaction();
+                    }
                 }
             });
 
@@ -144,6 +156,12 @@ public class NotificationFragment extends Fragment {
         messages.removeAllChangeListeners();
         messages = null;
 
+        unReadMessages.removeAllChangeListeners();
+        unReadMessages = null;
+
+        //通知设置未读消息数0
+        EventBus.getDefault().post(new NotificationEvent(0));
+
         //清空ppAdapter
         ppAdapter = null;
         //清空gridLayoutManager
@@ -161,7 +179,7 @@ public class NotificationFragment extends Fragment {
         realm = Realm.getDefaultInstance();
 
         //先取得本地数据库中的moments
-        messages = realm.where(Message.class).findAllSorted("createTime", Sort.DESCENDING);;
+        messages = realm.where(Message.class).findAllSorted("createTime", Sort.DESCENDING);
         //设置moments动态更新
         messages.addChangeListener(new OrderedRealmCollectionChangeListener<RealmResults<Message>>() {
             @Override
@@ -186,6 +204,18 @@ public class NotificationFragment extends Fragment {
                 for (OrderedCollectionChangeSet.Range range : modifications) {
                     ppAdapter.notifyItemRangeChanged(range.startIndex, range.length);
                 }
+            }
+        });
+
+        unReadMessages = realm.where(Message.class).equalTo("read", false).findAllSorted("createTime", Sort.DESCENDING);
+        //通知设置未读消息数
+        EventBus.getDefault().post(new NotificationEvent(unReadMessages.size()));
+        //设置unReadMessages动态更新
+        unReadMessages.addChangeListener(new OrderedRealmCollectionChangeListener<RealmResults<Message>>() {
+            @Override
+            public void onChange(RealmResults<Message> collection, OrderedCollectionChangeSet changeSet) {
+                //通知修改未读消息数
+                EventBus.getDefault().post(new NotificationEvent(unReadMessages.size()));
             }
         });
 

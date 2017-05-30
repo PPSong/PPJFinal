@@ -26,4 +26,5 @@
     <dimen name="nav_bar_avatar_size">64dp</dimen>
     <dimen name="avatar_super_big">120dp</dimen>
     <dimen name="icon_size">48dp</dimen>
+    <dimen name="icon_padding">12dp</dimen>
 </resources>
