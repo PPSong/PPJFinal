@@ -4,6 +4,8 @@
     <color name="colorPrimaryDark">#303F9F</color>
     <color name="colorAccent">#FF4081</color>
 
+    <color name="mid_grey">#40808080</color>
+
     <array name="loading_placeholders_dark">
         <item>#ff191919</item>
         <item>#ff212121</item>

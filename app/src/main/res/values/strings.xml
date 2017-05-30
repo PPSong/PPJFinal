@@ -1,9 +1,68 @@
 <resources>
     <string name="app_name">PPJ</string>
+
+    <string name="navigation_drawer_open">Open navigation drawer</string>
+    <string name="navigation_drawer_close">Close navigation drawer</string>
+
     <string name="action_settings">Settings</string>
+    <string name="login">登录</string>
 
     <!-- TODO: Remove or change this placeholder text -->
     <string name="hello_blank_fragment">Hello blank fragment</string>
+    <string name="register">注册</string>
+    <string name="username">用户名</string>
+    <string name="password">密码</string>
+    <string name="verify_code">认证码</string>
+    <string name="request_verify_code">获取认证码</string>
+    <string name="dashboard">片刻</string>
+    <string name="nearby">附近</string>
+    <string name="notification">动态</string>
+    <string name="exit">退出</string>
+    <string name="title_activity_moment_detail">MomentDetailActivity</string>
+    <string name="follow">关注</string>
+    <string name="fan">粉丝</string>
+    <string name="friend">好友</string>
+    <string name="create_moment">新建片刻</string>
+    <string name="publish">发布</string>
+    <string name="unfollowing">取消关注</string>
+    <string name="empty">无内容</string>
+    <string name="moment">片刻</string>
+    <string name="jiban">Jiban</string>
+    <string name="exit_tips">如需退出请使用退出菜单键</string>
+    <string name="earth">地球上,出去走两步会获得具体地址</string>
+    <string name="like_your_moment">like了你的片刻</string>
+    <string name="reply_your_moment">回复了你的片刻</string>
+    <string name="follow_you_footprint">follow了你的足迹</string>
+    <string name="you_sb_shoulder_meet">你和%1$s擦肩而过</string>
+    <string name="you_get_sb_mail">哟,你收到了%1$s寄来的一封书信呢</string>
+    <string name="you_follow_sb_moment">你迹录了%1$s的片刻</string>
+    <string name="you_and_sb_be_friend">恭喜,%1$s与你互粉成为伴友</string>
+    <string name="get_sb_reply_mail">好激动,%1$s给你回信了呢</string>
+    <string name="delete_are_you_sure">确认要删除吗?</string>
+    <string name="warn">警告</string>
+    <string name="meet">擦肩而过</string>
+    <string name="collect">收集</string>
+    <string name="be_collected">被收集</string>
+    <string name="set_password">设置密码*</string>
+    <string name="input_nickname">输入昵称*</string>
+    <string name="get_random">随机昵称</string>
+    <string name="male">男</string>
+    <string name="female">女</string>
+    <string name="action_sign_up">注册</string>
+    <string name="agreement">我同意遵守\"迹伴用户协议\"</string>
+    <string name="must_agree">请同意守则</string>
+    <string name="required">必填</string>
+    <string name="error_field_required">此项必填</string>
+    <string name="error_invalid_password">密码至少6位,最多12位</string>
+    <string name="error_invalid_nickname">昵称需要3-12个字符</string>
+    <string name="prompt_phone">手机号码*</string>
+    <string name="error_invalid_phone">手机号码格式不正确</string>
+    <string name="request">获取</string>
+    <string name="error_invalid_verify_code">验证码格式不正确</string>
+    <string name="send">发送</string>
+    <string name="bePrivate">私密</string>
+    <string name="get_new_message">得到新消息</string>
+    <string name="logining">登录中...</string>
+    <string name="login_please">请重新登录</string>
     <string name="no_more">没有更多了</string>
-    <string name="login_please">请登录</string>
 </resources>

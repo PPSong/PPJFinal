@@ -1,3 +1,4 @@
 <resources>
     <dimen name="fab_margin">16dp</dimen>
+    <dimen name="icon_area">48dp</dimen>
 </resources>
