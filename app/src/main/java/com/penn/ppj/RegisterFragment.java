@@ -303,7 +303,7 @@ public class RegisterFragment extends Fragment {
                     public void accept(@NonNull Long aLong) throws Exception {
                         if (aLong == PPApplication.REQUEST_VERIFY_CODE_INTERVAL) {
                             binding.requestVerifyCodeButton.setEnabled(true);
-                            binding.requestVerifyCodeButton.setText(getString(R.string.get_random));
+                            binding.requestVerifyCodeButton.setText(getString(R.string.request_verify_code));
                         } else {
                             binding.requestVerifyCodeButton.setText("" + (PPApplication.REQUEST_VERIFY_CODE_INTERVAL - aLong));
                         }

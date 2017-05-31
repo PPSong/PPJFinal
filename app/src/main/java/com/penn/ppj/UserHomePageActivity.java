@@ -250,6 +250,17 @@ public class UserHomePageActivity extends AppCompatActivity {
         setupButtonsText();
     }
 
+    private void setBinding(UserHomePage userHomePage) {
+        //修改本地记录lastVisitTime
+        realm.beginTransaction();
+        userHomePage.setLastVisitTime(System.currentTimeMillis());
+        realm.commitTransaction();
+
+        //set binding data
+        binding.setData(userHomePage);
+        setupButtonsText();
+    }
+
     private void followOrUnfollowMoment(boolean follow) {
         String api = follow ? "friend.follow" : "friend.unFollow";
 
@@ -268,7 +279,10 @@ public class UserHomePageActivity extends AppCompatActivity {
                         new Consumer<String>() {
                             @Override
                             public void accept(@NonNull String s) throws Exception {
+                                //取得最新的UserHomePage
                                 getServerUserHomePage(userId);
+                                //更新当前用户的RelatedUser关系
+                                PPApplication.doRefreshRelatedUsers();
                             }
                         },
                         new Consumer<Throwable>() {
@@ -346,6 +360,8 @@ public class UserHomePageActivity extends AppCompatActivity {
                                 if (userHomePage == null) {
                                     userHomePage = realm.where(UserHomePage.class).equalTo("userId", userId).findFirst();
                                     firstSetBinding(userHomePage);
+                                } else {
+                                    setBinding(userHomePage);
                                 }
                             }
                         }

@@ -30,6 +30,7 @@ import com.penn.ppj.model.realm.Moment;
 import com.penn.ppj.model.realm.MomentDetail;
 import com.penn.ppj.ppEnum.CommentStatus;
 import com.penn.ppj.ppEnum.PPValueType;
+import com.penn.ppj.util.ImageViewerActivity;
 import com.penn.ppj.util.PPJSONObject;
 import com.penn.ppj.util.PPPagerAdapter;
 import com.penn.ppj.util.PPRetrofit;
@@ -442,12 +443,12 @@ public class MomentDetailActivity extends AppCompatActivity {
                                               }
                                           });
 
-//        binding.mainImageView.setOnClickListener(new View.OnClickListener() {
-//            @Override
-//            public void onClick(View v) {
-//                ImageViewerActivity.start(MomentDetailActivity.this, PPHelper.get800ImageUrl(momentDetail.getPic()), binding.mainImageView);
-//            }
-//        });
+        binding.mainImageView.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                ImageViewerActivity.start(MomentDetailActivity.this, PPApplication.get800ImageUrl(momentDetail.getPic()), binding.mainImageView);
+            }
+        });
     }
 
     private void likeOrUnlikeMoment(boolean like) {

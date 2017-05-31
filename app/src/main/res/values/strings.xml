@@ -66,4 +66,5 @@
     <string name="login_please">请重新登录</string>
     <string name="no_more">没有更多了</string>
     <string name="title_activity_user_home_page">UserHomePageActivity</string>
+    <string name="need_permission">无此权限程序不能正常运行!</string>
 </resources>
