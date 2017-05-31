@@ -247,20 +247,28 @@ public class PPApplication extends Application {
         return getContext().getSharedPreferences(APP_NAME, Context.MODE_PRIVATE).getString(key, defaultValue);
     }
 
-    public static int calculateHeadMinHeight(Context context) {
-        DisplayMetrics displayMetrics = context.getResources().getDisplayMetrics();
+    public static int calculateHeadMinHeight() {
+        DisplayMetrics displayMetrics = getContext().getResources().getDisplayMetrics();
         float dpWidth = displayMetrics.widthPixels;
         int height_16_9 = (int) dpWidth * 9 / 16;
 
         return height_16_9;
     }
 
-    public static int calculateHeadHeight(Context context) {
-        DisplayMetrics displayMetrics = context.getResources().getDisplayMetrics();
+    public static int calculateHeadHeight() {
+        DisplayMetrics displayMetrics = getContext().getResources().getDisplayMetrics();
         float dpWidth = displayMetrics.widthPixels;
         int height_4_3 = (int) dpWidth * 3 / 4;
 
         return height_4_3;
+    }
+
+    public static int calculateMomentOverHeight() {
+        DisplayMetrics displayMetrics = getContext().getResources().getDisplayMetrics();
+        float dpWidth = displayMetrics.widthPixels;
+        int result = (int) ((dpWidth / calculateNoOfColumns()) * 9 / 16);
+
+        return result;
     }
 
     //解析json字符串(带空的默认值)

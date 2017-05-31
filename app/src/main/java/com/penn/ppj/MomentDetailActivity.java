@@ -125,9 +125,9 @@ public class MomentDetailActivity extends AppCompatActivity {
 //                            Intent intent = new Intent(MomentDetailActivity.this, MyProfileActivity.class);
 //                            MomentDetailActivity.this.startActivity(intent);
                         } else {
-//                            Intent intent = new Intent(MomentDetailActivity.this, UserHomePageActivity.class);
-//                            intent.putExtra("userId", momentDetail.getUserId());
-//                            startActivity(intent);
+                            Intent intent = new Intent(MomentDetailActivity.this, UserHomePageActivity.class);
+                            intent.putExtra("userId", momentDetail.getUserId());
+                            startActivity(intent);
                         }
                     }
                 });
@@ -162,6 +162,21 @@ public class MomentDetailActivity extends AppCompatActivity {
             } else {
                 final Comment comment = data.get(position - 1);
                 ((PPHoldView) holder).binding.setData(comment);
+
+                ((PPHoldView) holder).binding.avatarCircleImageView.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        String userId = comment.getUserId();
+                        if (userId.equals(PPApplication.getCurrentUserId())) {
+//                            Intent intent = new Intent(MomentDetailActivity.this, MyProfileActivity.class);
+//                            MomentDetailActivity.this.startActivity(intent);
+                        } else {
+                            Intent intent = new Intent(MomentDetailActivity.this, UserHomePageActivity.class);
+                            intent.putExtra("userId", userId);
+                            startActivity(intent);
+                        }
+                    }
+                });
 
                 ((PPHoldView) holder).binding.deleteImageButton.setOnClickListener(new View.OnClickListener() {
                     @Override
@@ -284,7 +299,7 @@ public class MomentDetailActivity extends AppCompatActivity {
 
         binding.recyclerView.setHasFixedSize(true);
 
-        final int headMinHeadHeight = PPApplication.calculateHeadMinHeight(this);
+        final int headMinHeadHeight = PPApplication.calculateHeadMinHeight();
 
         binding.recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
@@ -420,26 +435,7 @@ public class MomentDetailActivity extends AppCompatActivity {
                                               public void run() {
                                                   momentDetail = realm.where(MomentDetail.class).equalTo("id", momentId).findFirst();
                                                   if (momentDetail != null) {
-                                                      //如果本地有记录缓存, 取消loading modal
-                                                      binding.progressFrameLayout.setVisibility(View.INVISIBLE);
-                                                      //修改本地记录lastVisitTime
-                                                      realm.beginTransaction();
-                                                      momentDetail.setLastVisitTime(System.currentTimeMillis());
-                                                      realm.commitTransaction();
-
-                                                      momentDetail.addChangeListener(new RealmObjectChangeListener<MomentDetail>() {
-                                                          @Override
-                                                          public void onChange(MomentDetail object, ObjectChangeSet changeSet) {
-                                                              if (object.isValid()) {
-                                                                  binding.setData(object);
-                                                                  momentDetailHeadBinding.setData(object);
-                                                              }
-                                                          }
-                                                      });
-
-                                                      //set binding data
-                                                      binding.setData(momentDetail);
-                                                      momentDetailHeadBinding.setData(momentDetail);
+                                                      firstSetBinding(momentDetail);
                                                   }
 
                                                   getServerMomentDetail();
@@ -583,10 +579,7 @@ public class MomentDetailActivity extends AppCompatActivity {
 
                                 if (momentDetail == null) {
                                     momentDetail = realm.where(MomentDetail.class).equalTo("id", momentId).findFirst();
-                                    //set binding data
-                                    binding.setData(momentDetail);
-                                    momentDetailHeadBinding.setData(momentDetail);
-                                    binding.progressFrameLayout.setVisibility(View.INVISIBLE);
+                                    firstSetBinding(momentDetail);
                                 }
                             }
                         }
@@ -598,6 +591,29 @@ public class MomentDetailActivity extends AppCompatActivity {
                             }
                         }
                 );
+    }
+
+    private void firstSetBinding(MomentDetail momentDetail) {
+        //如果本地有记录缓存, 取消loading modal
+        binding.progressFrameLayout.setVisibility(View.INVISIBLE);
+        //修改本地记录lastVisitTime
+        realm.beginTransaction();
+        momentDetail.setLastVisitTime(System.currentTimeMillis());
+        realm.commitTransaction();
+
+        momentDetail.addChangeListener(new RealmObjectChangeListener<MomentDetail>() {
+            @Override
+            public void onChange(MomentDetail object, ObjectChangeSet changeSet) {
+                if (object.isValid()) {
+                    binding.setData(object);
+                    momentDetailHeadBinding.setData(object);
+                }
+            }
+        });
+
+        //set binding data
+        binding.setData(momentDetail);
+        momentDetailHeadBinding.setData(momentDetail);
     }
 
     private void processMomentDetailAndComments(String momentDetailString, String commentsString) {
@@ -669,8 +685,8 @@ public class MomentDetailActivity extends AppCompatActivity {
 
     private void setupCommentButton() {
         titleHeight = momentDetailHeadBinding.contentTextView.getHeight();
-        headPicHeight = PPApplication.calculateHeadHeight(this);
-        headPicMinHeight = PPApplication.calculateHeadMinHeight(this);
+        headPicHeight = PPApplication.calculateHeadHeight();
+        headPicMinHeight = PPApplication.calculateHeadMinHeight();
         floatingButtonHalfHeight = binding.commentFloatingActionButton.getHeight() / 2;
 
         likeButtonSetuped = true;
