@@ -523,6 +523,7 @@ public class MomentDetailActivity extends AppCompatActivity {
         binding.setData(momentDetail);
     }
 
+    //pptodo 可以使用PPApplication.getServerMomentDetail代替
     private void getServerMomentDetail() {
         //请求服务器最新MomentDetail记录
         PPJSONObject jBody1 = new PPJSONObject();
@@ -616,6 +617,7 @@ public class MomentDetailActivity extends AppCompatActivity {
         momentDetailHeadBinding.setData(momentDetail);
     }
 
+    //pptodo 可以使用PPApplication.processMomentDetailAndComments代替
     private void processMomentDetailAndComments(String momentDetailString, String commentsString) {
         //构造comment detail和comments
         long now = System.currentTimeMillis();

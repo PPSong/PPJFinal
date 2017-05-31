@@ -247,6 +247,7 @@ public class UserHomePageActivity extends AppCompatActivity {
 
         //set binding data
         binding.setData(userHomePage);
+        setupButtonsText();
     }
 
     private void followOrUnfollowMoment(boolean follow) {
@@ -385,5 +386,11 @@ public class UserHomePageActivity extends AppCompatActivity {
             }
 
         }
+    }
+
+    private void setupButtonsText() {
+        binding.meetButton.setText("" + userHomePage.getMeets() + getString(R.string.meet));
+        binding.collectButton.setText("" + userHomePage.getCollects() + getString(R.string.collect));
+        binding.beCollectedButton.setText("" + userHomePage.getBeCollecteds() + getString(R.string.be_collected));
     }
 }

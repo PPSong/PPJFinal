@@ -30,8 +30,10 @@ import com.penn.ppj.model.realm.CurrentUser;
 import com.penn.ppj.model.realm.Message;
 import com.penn.ppj.model.realm.Moment;
 import com.penn.ppj.model.realm.MomentCreating;
+import com.penn.ppj.model.realm.MomentDetail;
 import com.penn.ppj.model.realm.Pic;
 import com.penn.ppj.model.realm.RelatedUser;
+import com.penn.ppj.ppEnum.CommentStatus;
 import com.penn.ppj.ppEnum.MomentStatus;
 import com.penn.ppj.ppEnum.PPValueType;
 import com.penn.ppj.ppEnum.PicStatus;
@@ -49,7 +51,10 @@ import org.greenrobot.eventbus.EventBus;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.msgpack.core.MessagePack;
+import org.msgpack.core.MessageUnpacker;
 
+import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.regex.Pattern;
 
@@ -73,6 +78,7 @@ import io.socket.client.IO;
 import io.socket.client.Socket;
 import io.socket.emitter.Emitter;
 
+import static android.R.attr.id;
 import static com.penn.ppj.R.string.moment;
 
 /**
@@ -534,6 +540,11 @@ public class PPApplication extends Application {
 
     //得到socket push后需要做的动作
     public static void getSocketPush() {
+        //更新fans, follows, friends
+        doRefreshRelatedUsers();
+
+        //获取最新通知
+        getLatestMessages();
     }
 
     //刷新CurrentUser
@@ -723,6 +734,25 @@ public class PPApplication extends Application {
                                 parseAndSaveToLocalDB(s3, RelatedUserType.FRIEND);
 
                                 return "OK";
+                            }
+                        }
+                );
+    }
+
+    public static void doRefreshRelatedUsers() {
+        refreshRelatedUsers()
+                .subscribeOn(Schedulers.io())
+                .subscribe(
+                        new Consumer<String>() {
+                            @Override
+                            public void accept(@NonNull String s) throws Exception {
+
+                            }
+                        },
+                        new Consumer<Throwable>() {
+                            @Override
+                            public void accept(@NonNull Throwable throwable) throws Exception {
+                                PPApplication.error(throwable.toString());
                             }
                         }
                 );
@@ -1120,6 +1150,136 @@ public class PPApplication extends Application {
         );
     }
 
+    public static void getServerMomentDetail(final String momentId) {
+        //请求服务器最新MomentDetail记录
+        PPJSONObject jBody1 = new PPJSONObject();
+        jBody1
+                .put("id", momentId)
+                .put("checkFollow", "1")
+                .put("checkLike", "1");
+
+        final Observable<String> apiResult1 = PPRetrofit.getInstance().api("moment.detail", jBody1.getJSONObject());
+
+        PPJSONObject jBody2 = new PPJSONObject();
+        jBody2
+                .put("id", momentId)
+                .put("beforeTime", "")
+                .put("afterTime", "1");
+
+        final Observable<String> apiResult2 = PPRetrofit.getInstance().api("moment.getReplies", jBody2.getJSONObject());
+
+        Observable
+                .zip(
+                        apiResult1, apiResult2, new BiFunction<String, String, String[]>() {
+
+                            @Override
+                            public String[] apply(@NonNull String s, @NonNull String s2) throws Exception {
+                                String[] result = {s, s2};
+
+                                return result;
+                            }
+                        }
+                )
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        new Consumer<String[]>() {
+                            @Override
+                            public void accept(@NonNull String[] result) throws Exception {
+                                //更新本地最新MomentDetail记录到最新MomentDetail记录
+                                PPWarn ppWarn = ppWarning(result[0]);
+
+                                if (ppWarn != null) {
+                                    throw new Exception(ppWarn.msg);
+                                }
+
+                                PPWarn ppWarn2 = ppWarning(result[1]);
+
+                                if (ppWarn2 != null) {
+                                    throw new Exception(ppWarn2.msg);
+                                }
+
+                                processMomentDetailAndComments(result[0], result[1]);
+                            }
+                        }
+                        ,
+                        new Consumer<Throwable>() {
+                            @Override
+                            public void accept(@NonNull Throwable throwable) throws Exception {
+                                error(throwable.toString());
+                            }
+                        }
+                );
+    }
+
+    private static void processMomentDetailAndComments(String momentDetailString, String commentsString) {
+        //构造comment detail和comments
+        long now = System.currentTimeMillis();
+
+        String momentId = ppFromString(momentDetailString, "data._id").getAsString();
+
+        MomentDetail momentDetail = new MomentDetail();
+        momentDetail.setId(momentId);
+        momentDetail.setGeo(ppFromString(momentDetailString, "data.location.geo.0").getAsString() + "," + ppFromString(momentDetailString, "data.location.geo.1").getAsString());
+        momentDetail.setAddress(ppFromString(momentDetailString, "data.location.detail").getAsString());
+        momentDetail.setCity(ppFromString(momentDetailString, "data.location.city").getAsString());
+        momentDetail.setUserId(ppFromString(momentDetailString, "data._creator.id").getAsString());
+        momentDetail.setContent(ppFromString(momentDetailString, "data.content").getAsString());
+        momentDetail.setLiked(ppFromString(momentDetailString, "data.isLiked").getAsInt() == 1 ? true : false);
+        momentDetail.setCreateTime(ppFromString(momentDetailString, "data.createTime").getAsLong());
+        momentDetail.setPic(ppFromString(momentDetailString, "data.pics.0").getAsString());
+        momentDetail.setAvatar(ppFromString(momentDetailString, "data._creator.head").getAsString());
+        momentDetail.setNickname(ppFromString(momentDetailString, "data._creator.nickname").getAsString());
+        momentDetail.setLastVisitTime(now);
+
+        JsonArray ja = ppFromString(commentsString, "data.list").getAsJsonArray();
+
+        try (Realm realm = Realm.getDefaultInstance()) {
+            realm.beginTransaction();
+
+            try {
+                for (int i = 0; i < ja.size(); i++) {
+
+                    long createTime = ppFromString(commentsString, "data.list." + i + ".createTime").getAsLong();
+                    String userId = ppFromString(commentsString, "data.list." + i + "._creator.id").getAsString();
+
+                    Comment comment = realm.where(Comment.class).equalTo("key", createTime + "_" + userId).equalTo("deleted", true).findFirst();
+                    if (comment != null) {
+                        //如果这条记录本地已经标志为deleted, 则跳过
+                        continue;
+                    }
+
+                    comment = new Comment();
+
+                    comment.setKey(createTime + "_" + userId);
+                    comment.setId(ppFromString(commentsString, "data.list." + i + "._id").getAsString());
+                    comment.setUserId(ppFromString(commentsString, "data.list." + i + "._creator.id").getAsString());
+                    comment.setMomentId(momentId);
+                    comment.setContent(ppFromString(commentsString, "data.list." + i + ".content").getAsString());
+                    comment.setCreateTime(createTime);
+                    comment.setNickname(ppFromString(commentsString, "data.list." + i + "._creator.nickname").getAsString());
+                    comment.setAvatar(ppFromString(commentsString, "data.list." + i + "._creator.head").getAsString());
+                    comment.setStatus(CommentStatus.NET);
+                    comment.setReferUserId(ppFromString(commentsString, "data.list." + i + ".refer.id", PPValueType.STRING).getAsString());
+                    comment.setReferNickname(ppFromString(commentsString, "data.list." + i + ".refer.nickname", PPValueType.STRING).getAsString());
+                    comment.setBePrivate(ppFromString(commentsString, "data.list." + i + ".isPrivate").getAsBoolean());
+                    comment.setLastVisitTime(now);
+                    realm.insertOrUpdate(comment);
+                }
+
+                //把服务器上已删除的comment从本地删掉
+                realm.where(Comment.class).equalTo("momentId", momentId).notEqualTo("lastVisitTime", now).findAll().deleteAllFromRealm();
+
+                realm.insertOrUpdate(momentDetail);
+
+                realm.commitTransaction();
+            } catch (Exception e) {
+                error(e.toString());
+                realm.cancelTransaction();
+            }
+        }
+    }
+
     public static void removeComment(final String commentId, final String momentId) {
 
         PPJSONObject jBody = new PPJSONObject();
@@ -1205,6 +1365,7 @@ public class PPApplication extends Application {
                         }
                 );
     }
+
     //------------------------------private------------------------------
     //设置DefaultConfiguration for 登录用户
     public static void initRealm(String userId) {
@@ -1296,10 +1457,27 @@ public class PPApplication extends Application {
                 .on(
                         "sync",
                         new Emitter.Listener() {
-
                             @Override
                             public void call(Object... args) {
-                                getSocketPush();
+                                MessageUnpacker unPacker = MessagePack.newDefaultUnpacker((byte[]) args[0]);
+
+                                try {
+                                    String msg = unPacker.unpackValue().toString();
+                                    JSONArray jsonArray = new JSONArray(msg);
+                                    Log.v("ppLog", "sync from server:" + msg);
+
+                                    if (jsonArray.get(0).toString().equals("moment_reply")) {
+                                        JSONObject body = jsonArray.getJSONObject(1);
+                                        String momentId = body.getString("mid");
+                                        getServerMomentDetail(momentId);
+                                    } else {
+                                        getSocketPush();
+                                    }
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                    Log.v("ppLog", "sync from server err:");
+                                }
+
                             }
                         })
                 .on(

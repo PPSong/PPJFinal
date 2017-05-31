@@ -217,7 +217,7 @@ public class MainActivity extends AppCompatActivity {
         if (PPApplication.isLogin()) {
             onLogin();
             //更新相关用户
-            refreshRelatedUsers();
+            PPApplication.doRefreshRelatedUsers();
         }
     }
 
@@ -261,25 +261,5 @@ public class MainActivity extends AppCompatActivity {
 
         //设置CurrentUser动态更新
         currentUser.removeAllChangeListeners();
-    }
-
-    //refresh RelatedUsers
-    private void refreshRelatedUsers() {
-        PPApplication.refreshRelatedUsers()
-                .subscribeOn(Schedulers.io())
-                .subscribe(
-                        new Consumer<String>() {
-                            @Override
-                            public void accept(@NonNull String s) throws Exception {
-
-                            }
-                        },
-                        new Consumer<Throwable>() {
-                            @Override
-                            public void accept(@NonNull Throwable throwable) throws Exception {
-                                PPApplication.error(throwable.toString());
-                            }
-                        }
-                );
     }
 }

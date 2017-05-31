@@ -226,7 +226,7 @@ public class MyProfileActivity extends TakePhotoFragmentActivity {
         friends.addChangeListener(new OrderedRealmCollectionChangeListener<RealmResults<RelatedUser>>() {
             @Override
             public void onChange(RealmResults<RelatedUser> collection, OrderedCollectionChangeSet changeSet) {
-                binding.friendsButton.setText(friends.size());
+                binding.friendsButton.setText("" + friends.size() + getString(R.string.friend));
             }
         });
 
@@ -234,7 +234,7 @@ public class MyProfileActivity extends TakePhotoFragmentActivity {
         follows.addChangeListener(new OrderedRealmCollectionChangeListener<RealmResults<RelatedUser>>() {
             @Override
             public void onChange(RealmResults<RelatedUser> collection, OrderedCollectionChangeSet changeSet) {
-                binding.followsButton.setText(follows.size());
+                binding.followsButton.setText("" + follows.size() + getString(R.string.follow));
             }
         });
 
@@ -242,7 +242,7 @@ public class MyProfileActivity extends TakePhotoFragmentActivity {
         fans.addChangeListener(new OrderedRealmCollectionChangeListener<RealmResults<RelatedUser>>() {
             @Override
             public void onChange(RealmResults<RelatedUser> collection, OrderedCollectionChangeSet changeSet) {
-                binding.fansButton.setText(fans.size());
+                binding.fansButton.setText("" + fans.size() + getString(R.string.fan));
             }
         });
 

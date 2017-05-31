@@ -1,5 +1,6 @@
 package com.penn.ppj;
 
+import android.content.Intent;
 import android.databinding.DataBindingUtil;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
@@ -19,6 +20,7 @@ import com.penn.ppj.messageEvent.UserLoginEvent;
 import com.penn.ppj.messageEvent.UserLogoutEvent;
 import com.penn.ppj.model.realm.Message;
 import com.penn.ppj.model.realm.Moment;
+import com.penn.ppj.model.realm.UserHomePage;
 
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
@@ -74,6 +76,17 @@ public class NotificationFragment extends Fragment {
                         tmpMessage.setRead(true);
 
                         realm.commitTransaction();
+                    }
+
+                    //跳转到消息详情
+                    if (message.getType() == 1 || message.getType() == 6) {
+                        Intent intent = new Intent(getContext(), MomentDetailActivity.class);
+                        intent.putExtra("momentId", message.getMomentId());
+                        startActivity(intent);
+                    } else {
+                        Intent intent = new Intent(getContext(), UserHomePageActivity.class);
+                        intent.putExtra("userId", message.getUserId());
+                        startActivity(intent);
                     }
                 }
             });
