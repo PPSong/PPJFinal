@@ -83,9 +83,9 @@ public class NearbyFragment extends Fragment {
                     if (PPApplication.isLogin()) {
                         int position = binding.recyclerView.getChildAdapterPosition(v);
                         NearbyMoment nearbyMoment = data.get(position);
-//                        Intent intent = new Intent(getContext(), MomentDetailActivity.class);
-//                        intent.putExtra("momentId", nearbyMoment.getId());
-//                        startActivity(intent);
+                        Intent intent = new Intent(getContext(), MomentDetailActivity.class);
+                        intent.putExtra("momentId", nearbyMoment.getId());
+                        startActivity(intent);
                     } else {
                         PPApplication.goLogin(getActivity());
                     }

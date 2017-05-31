@@ -1,5 +1,6 @@
 package com.penn.ppj;
 
+import android.content.Intent;
 import android.databinding.DataBindingUtil;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
@@ -54,7 +55,7 @@ import static com.penn.ppj.PPApplication.refreshRelatedUsers;
 
 public class DashboardFragment extends Fragment {
     //变量
-    private FragmentDashboardBinding binding;
+    public FragmentDashboardBinding binding;
     private Realm realm;
     private RealmResults<Moment> moments;
     private PPAdapter ppAdapter;
@@ -83,7 +84,15 @@ public class DashboardFragment extends Fragment {
             momentOverviewCellBinding.getRoot().setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
-
+                    if (PPApplication.isLogin()) {
+                        int position = binding.recyclerView.getChildAdapterPosition(v);
+                        Moment moment = data.get(position);
+                        Intent intent = new Intent(getContext(), MomentDetailActivity.class);
+                        intent.putExtra("momentId", moment.getId());
+                        startActivity(intent);
+                    } else {
+                        PPApplication.goLogin(getActivity());
+                    }
                 }
             });
 

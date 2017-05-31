@@ -16,6 +16,9 @@ import android.view.Menu;
 import android.view.MenuItem;
 
 import com.penn.ppj.databinding.ActivityMainBinding;
+import com.penn.ppj.messageEvent.MomentCreatedEvent;
+import com.penn.ppj.messageEvent.MomentDeleteEvent;
+import com.penn.ppj.messageEvent.MomentPublishEvent;
 import com.penn.ppj.messageEvent.NotificationEvent;
 import com.penn.ppj.messageEvent.UserLoginEvent;
 import com.penn.ppj.messageEvent.UserLogoutEvent;
@@ -42,6 +45,7 @@ public class MainActivity extends AppCompatActivity {
     private ActivityMainBinding binding;
     private Realm realm;
     private CurrentUser currentUser;
+    private DashboardFragment dashboardFragment;
 
     //构造函数
 
@@ -87,6 +91,22 @@ public class MainActivity extends AppCompatActivity {
         setBadge(event.num);
     }
 
+    @Subscribe(threadMode = ThreadMode.MAIN)
+    public void MomentCreatedEvent(MomentCreatedEvent event) {
+        binding.viewPager.setCurrentItem(1);
+        dashboardFragment.binding.recyclerView.scrollToPosition(0);
+    }
+
+    @Subscribe(threadMode = ThreadMode.BACKGROUND)
+    public void MomentDeleteEvent(MomentDeleteEvent event) {
+        PPApplication.removeMoment(event.id);
+    }
+
+    @Subscribe(threadMode = ThreadMode.BACKGROUND)
+    public void MomentPublishEvent(MomentPublishEvent event) {
+        PPApplication.refreshMoment(event.id);
+    }
+
     //帮助函数
     public void showDb(View v) {
         Realm realm = Realm.getDefaultInstance();
@@ -130,7 +150,7 @@ public class MainActivity extends AppCompatActivity {
         //view pager
         PPPagerAdapter adapter = new PPPagerAdapter(getSupportFragmentManager());
         NearbyFragment nearbyFragment = NearbyFragment.newInstance();
-        DashboardFragment dashboardFragment = DashboardFragment.newInstance();
+        dashboardFragment = DashboardFragment.newInstance();
         NotificationFragment notificationFragment = NotificationFragment.newInstance();
         adapter.addFragment(nearbyFragment, "C1");
         adapter.addFragment(dashboardFragment, "C2");
@@ -160,6 +180,15 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 binding.viewPager.setCurrentItem(2, true);
+            }
+        });
+
+        //fab
+        binding.fab.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Intent intent = new Intent(MainActivity.this, MomentCreatingActivity.class);
+                startActivity(intent);
             }
         });
 
@@ -196,7 +225,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         //初始化realm
-        PPApplication.initRealm(PPApplication.getPrefStringValue(PPApplication.CUR_USER_ID, ""));
+        PPApplication.initRealm(PPApplication.getCurrentUserId());
         realm = Realm.getDefaultInstance();
 
         //先取得本地数据库中的CurrentUser

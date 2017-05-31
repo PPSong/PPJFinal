@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:context="com.penn.ppj.MomentDetailActivity">
+
+    <data>
+
+        <variable
+            name="data"
+            type="com.penn.ppj.model.realm.MomentDetail" />
+    </data>
+
+    <android.support.design.widget.CoordinatorLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <android.support.percent.PercentFrameLayout
+            android:id="@+id/main_percent_frame_layout"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@android:color/white">
+
+            <android.support.v7.widget.RecyclerView
+                android:id="@+id/recycler_view"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+
+            <FrameLayout
+                android:id="@+id/main_image_container_frame_layout"
+                android:background="@android:color/white"
+                app:layout_aspectRatio="133%"
+                app:layout_widthPercent="100%">
+
+                <ImageView
+                    android:id="@+id/main_image_view"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@android:color/white"
+                    android:scaleType="centerCrop"
+                    app:image800="@{data.pic}" />
+
+                <ToggleButton
+                    android:id="@+id/like_toggle_button"
+                    android:layout_width="@dimen/button_height"
+                    android:layout_height="@dimen/button_height"
+                    android:layout_gravity="bottom|left"
+                    android:layout_margin="@dimen/common"
+                    android:background="@drawable/asl_fab_heart"
+                    android:checked="@{data.liked}"
+                    android:textOff=""
+                    android:textOn="" />
+            </FrameLayout>
+
+            <android.support.design.widget.FloatingActionButton
+                android:id="@+id/comment_floating_action_button"
+                android:layout_width="@dimen/fab"
+                android:layout_height="@dimen/fab"
+                android:layout_gravity="end"
+                android:layout_marginEnd="@dimen/common"
+                android:src="@drawable/ic_chat_black_24dp"
+                android:tint="@android:color/white"
+                android:visibility="invisible"
+                app:backgroundTint="@color/dribbble" />
+
+            <android.support.constraint.ConstraintLayout
+                android:id="@+id/toolbar_constraint_layout"
+                android:layout_width="match_parent"
+                android:layout_height="?attr/actionBarSize"
+                android:background="@drawable/ab_gradient_dark"
+                android:elevation="21dp"
+                android:orientation="horizontal">
+
+                <ImageButton
+                    android:id="@+id/back_image_button"
+                    android:layout_width="@android:dimen/app_icon_size"
+                    android:layout_height="@android:dimen/app_icon_size"
+                    android:layout_marginBottom="8dp"
+                    android:layout_marginLeft="8dp"
+                    android:background="@android:color/transparent"
+                    android:src="@drawable/ic_arrow_back"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintLeft_toLeftOf="parent" />
+
+                <ImageButton
+                    android:id="@+id/delete_moment_image_button"
+                    android:layout_width="@android:dimen/app_icon_size"
+                    android:layout_height="@android:dimen/app_icon_size"
+                    android:layout_marginBottom="8dp"
+                    android:layout_marginRight="8dp"
+                    android:background="@android:color/transparent"
+                    android:src="@drawable/ic_delete_black_24dp"
+                    android:tint="@android:color/white"
+                    android:visibility="@{data.deletable()}"
+                    app:layout_constraintBottom_toBottomOf="parent"
+                    app:layout_constraintRight_toRightOf="parent" />
+
+            </android.support.constraint.ConstraintLayout>
+
+            <FrameLayout
+                android:id="@+id/progress_frame_layout"
+                android:background="@android:color/white"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:elevation="21dp">
+
+                <ImageButton
+                    android:id="@+id/back_button"
+                    android:layout_width="@dimen/icon"
+                    android:layout_height="@dimen/icon"
+                    android:layout_marginLeft="16dp"
+                    android:layout_marginTop="32dp"
+                    android:background="@android:color/transparent"
+                    android:src="@drawable/ic_arrow_back_black_24dp" />
+
+                <ProgressBar
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center" />
+
+            </FrameLayout>
+
+        </android.support.percent.PercentFrameLayout>
+
+    </android.support.design.widget.CoordinatorLayout>
+
+</layout>
+

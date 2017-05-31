@@ -233,6 +233,9 @@ public class NotificationFragment extends Fragment {
     private void setup() {
         if (PPApplication.isLogin()) {
             onLogin();
+        } else {
+            //通知设置未读消息数0
+            EventBus.getDefault().post(new NotificationEvent(0));
         }
     }
 }

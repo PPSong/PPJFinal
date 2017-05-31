@@ -22,11 +22,13 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
+import com.penn.ppj.messageEvent.MomentPublishEvent;
 import com.penn.ppj.messageEvent.UserLoginEvent;
 import com.penn.ppj.messageEvent.UserLogoutEvent;
 import com.penn.ppj.model.realm.CurrentUser;
 import com.penn.ppj.model.realm.Message;
 import com.penn.ppj.model.realm.Moment;
+import com.penn.ppj.model.realm.MomentCreating;
 import com.penn.ppj.model.realm.Pic;
 import com.penn.ppj.model.realm.RelatedUser;
 import com.penn.ppj.ppEnum.MomentStatus;
@@ -36,9 +38,14 @@ import com.penn.ppj.ppEnum.RelatedUserType;
 import com.penn.ppj.util.PPJSONObject;
 import com.penn.ppj.util.PPRetrofit;
 import com.penn.ppj.util.PPWarn;
+import com.qiniu.android.http.ResponseInfo;
+import com.qiniu.android.storage.Configuration;
+import com.qiniu.android.storage.UpCompletionHandler;
+import com.qiniu.android.storage.UploadManager;
 import com.squareup.picasso.Picasso;
 
 import org.greenrobot.eventbus.EventBus;
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -47,6 +54,8 @@ import java.util.regex.Pattern;
 
 import es.dmoral.toasty.Toasty;
 import io.reactivex.Observable;
+import io.reactivex.ObservableEmitter;
+import io.reactivex.ObservableOnSubscribe;
 import io.reactivex.ObservableSource;
 import io.reactivex.android.schedulers.AndroidSchedulers;
 import io.reactivex.annotations.NonNull;
@@ -84,6 +93,8 @@ public class PPApplication extends Application {
 
     private static String APP_NAME = "PPJ";
     private static final String LATEST_GEO = "LATEST_GEO";
+    private static final String LATEST_ADDRESS = "LATEST_ADDRESS";
+
     private static Context appContext;
     private static final String qiniuBase = "http://7xu8w0.com1.z0.glb.clouddn.com/";
     //pptodo 修改默认地理位置
@@ -91,6 +102,9 @@ public class PPApplication extends Application {
     private static ProgressDialog progressDialog;
 
     private static Socket socket;
+
+    private static Configuration config = new Configuration.Builder().build();
+    private static UploadManager uploadManager = new UploadManager(config);
 
     @Override
     public void onCreate() {
@@ -112,6 +126,16 @@ public class PPApplication extends Application {
         }
     }
 
+    @BindingAdapter({"bind:imageData"})
+    public static void setImageViewDataResource(final ImageView imageView, byte[] pic) {
+        if (pic == null) {
+            imageView.setImageResource(android.R.color.transparent);
+            return;
+        }
+        Bitmap bmp = BitmapFactory.decodeByteArray(pic, 0, pic.length);
+        imageView.setImageBitmap(bmp);
+    }
+
     @BindingAdapter({"bind:avatarImageUrl"})
     public static void setAvatarImageViewResource(final ImageView imageView, String pic) {
         setImageViewResource(imageView, pic, 80);
@@ -126,6 +150,11 @@ public class PPApplication extends Application {
             Bitmap bmp = BitmapFactory.decodeByteArray(data, 0, data.length);
             imageView.setImageBitmap(bmp);
         }
+    }
+
+    @BindingAdapter({"bind:image800"})
+    public static void image800(final ImageView imageView, String pic) {
+        setImageViewResource(imageView, pic, 800);
     }
 
     @BindingAdapter({"bind:image180"})
@@ -159,6 +188,10 @@ public class PPApplication extends Application {
         }
     }
 
+    public static String getCurrentUserId() {
+        return getPrefStringValue(CUR_USER_ID, "");
+    }
+
     //根据位置计算图片背景色
     public static int getMomentOverviewBackgroundColor(int position) {
         TypedArray ta = getContext().getResources().obtainTypedArray(R.array.loading_placeholders_dark);
@@ -176,6 +209,8 @@ public class PPApplication extends Application {
 
     //去登录或注册
     public static void goLogin(Activity activity) {
+        Intent intent = new Intent(activity, LoginActivity.class);
+        activity.startActivity(intent);
 
     }
 
@@ -192,6 +227,10 @@ public class PPApplication extends Application {
         return getPrefStringValue(LATEST_GEO, DEFAULT_GEO);
     }
 
+    public static String getLatestAddress() {
+        return getPrefStringValue(LATEST_ADDRESS, PPApplication.getContext().getString(R.string.earth));
+    }
+
     //设置pref值
     public static void setPrefStringValue(String key, String value) {
         getContext().getSharedPreferences(APP_NAME, Context.MODE_PRIVATE).edit().putString(key, value).apply();
@@ -205,6 +244,22 @@ public class PPApplication extends Application {
     //取pref值
     public static String getPrefStringValue(String key, String defaultValue) {
         return getContext().getSharedPreferences(APP_NAME, Context.MODE_PRIVATE).getString(key, defaultValue);
+    }
+
+    public static int calculateHeadMinHeight(Context context) {
+        DisplayMetrics displayMetrics = context.getResources().getDisplayMetrics();
+        float dpWidth = displayMetrics.widthPixels;
+        int height_16_9 = (int) dpWidth * 9 / 16;
+
+        return height_16_9;
+    }
+
+    public static int calculateHeadHeight(Context context) {
+        DisplayMetrics displayMetrics = context.getResources().getDisplayMetrics();
+        float dpWidth = displayMetrics.widthPixels;
+        int height_4_3 = (int) dpWidth * 3 / 4;
+
+        return height_4_3;
     }
 
     //解析json字符串(带空的默认值)
@@ -891,6 +946,212 @@ public class PPApplication extends Application {
         }
     }
 
+    public static void uploadMoment(final String momentCreatingKey) {
+        final byte[] imageData;
+        String address;
+        String geo;
+        String content;
+        long createTime;
+
+        try (Realm realm = Realm.getDefaultInstance()) {
+            MomentCreating momentCreating = realm.where(MomentCreating.class).equalTo("key", momentCreatingKey).findFirst();
+
+            imageData = momentCreating.getPic();
+            address = momentCreating.getAddress();
+            geo = momentCreating.getGeo();
+            content = momentCreating.getContent();
+            createTime = momentCreating.getCreateTime();
+        }
+
+        //申请上传图片的token
+        final String key = momentCreatingKey + "_0";
+        PPJSONObject jBody = new PPJSONObject();
+        jBody
+                .put("type", "public")
+                .put("filename", key);
+
+        final Observable<String> requestToken = PPRetrofit.getInstance().api("system.generateUploadToken", jBody.getJSONObject());
+
+        //上传moment
+        JSONArray jsonArrayPics = new JSONArray();
+
+        jsonArrayPics.put(key);
+
+        PPJSONObject jBody1 = new PPJSONObject();
+        jBody1
+                .put("pics", jsonArrayPics)
+                .put("address", address)
+                .put("geo", geo)
+                .put("content", content)
+                .put("createTime", createTime);
+
+        final Observable<String> apiResult1 = PPRetrofit.getInstance()
+                .api("moment.publish", jBody1.getJSONObject());
+
+        requestToken
+                .subscribeOn(Schedulers.io())
+                .observeOn(Schedulers.io())
+                .flatMap(
+                        new Function<String, ObservableSource<String>>() {
+                            @Override
+                            public ObservableSource<String> apply(@NonNull String s) throws Exception {
+                                PPWarn ppWarn = ppWarning(s);
+                                if (ppWarn != null) {
+                                    throw new Exception("ppError:" + ppWarn.msg + ":" + key);
+                                }
+                                String token = ppFromString(s, "data.token").getAsString();
+                                return uploadSingleImage(imageData, key, token);
+                            }
+                        }
+                )
+                .observeOn(Schedulers.io())
+                .flatMap(new Function<String, ObservableSource<String>>() {
+                    @Override
+                    public ObservableSource<String> apply(@NonNull String s) throws Exception {
+                        return apiResult1;
+                    }
+                })
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        new Consumer<String>() {
+                            @Override
+                            public void accept(@NonNull String s) throws Exception {
+                                PPWarn ppWarn = ppWarning(s);
+                                if (ppWarn != null) {
+                                    throw new Exception("ppError:" + ppWarn.msg);
+                                }
+
+                                String uploadedMomentId = ppFromString(s, "data.id").getAsString();
+
+                                try (Realm realm = Realm.getDefaultInstance()) {
+                                    MomentCreating momentCreating = realm.where(MomentCreating.class).equalTo("key", momentCreatingKey).findFirst();
+
+                                    realm.beginTransaction();
+                                    //删除momentCreating
+                                    momentCreating.deleteFromRealm();
+
+                                    realm.commitTransaction();
+
+                                    //通知更新本地Moment中对应moment
+                                    EventBus.getDefault().post(new MomentPublishEvent(uploadedMomentId));
+                                }
+                            }
+                        },
+                        new Consumer<Throwable>() {
+                            @Override
+                            public void accept(@NonNull Throwable throwable) throws Exception {
+                                try (Realm realm = Realm.getDefaultInstance()) {
+                                    MomentCreating momentCreating = realm.where(MomentCreating.class).equalTo("key", momentCreatingKey).findFirst();
+                                    Moment moment = realm.where(Moment.class).equalTo("key", momentCreatingKey).findFirst();
+
+                                    realm.beginTransaction();
+                                    //修改momentCreating放入Moment状态
+                                    momentCreating.setStatus(MomentStatus.FAILED);
+                                    moment.setStatus(MomentStatus.FAILED);
+
+                                    realm.commitTransaction();
+                                }
+                                error(throwable.toString());
+                            }
+                        }
+                );
+    }
+
+    public static void refreshMoment(String id) {
+        PPJSONObject jBody = new PPJSONObject();
+        jBody
+                .put("id", id);
+
+        final Observable<String> apiResult = PPRetrofit.getInstance()
+                .api("moment.detail", jBody.getJSONObject());
+
+        apiResult.subscribe(
+                new Consumer<String>() {
+                    @Override
+                    public void accept(@NonNull String s) throws Exception {
+                        PPWarn ppWarn = ppWarning(s);
+                        if (ppWarn != null) {
+                            throw new Exception(ppWarn.msg);
+                        }
+
+                        long createTime = ppFromString(s, "data.createTime").getAsLong();
+
+                        try (Realm realm = Realm.getDefaultInstance()) {
+                            try {
+                                realm.beginTransaction();
+
+                                Moment moment = new Moment();
+                                moment.setKey(createTime + "_" + ppFromString(s, "data._creator.id").getAsString());
+                                moment.setId(ppFromString(s, "data._id").getAsString());
+                                moment.setUserId(ppFromString(s, "data._creator.id").getAsString());
+                                moment.setCreateTime(createTime);
+                                moment.setStatus(MomentStatus.NET);
+                                moment.setAvatar(ppFromString(s, "data._creator.head").getAsString());
+
+                                Pic pic = new Pic();
+                                pic.setKey(ppFromString(s, "data.pics.0").getAsString());
+                                pic.setStatus(PicStatus.NET);
+                                moment.setPic(pic);
+
+                                realm.insertOrUpdate(moment);
+
+                                realm.commitTransaction();
+                            } catch (Exception e) {
+                                realm.cancelTransaction();
+                            }
+                        }
+                    }
+                },
+                new Consumer<Throwable>() {
+                    @Override
+                    public void accept(@NonNull Throwable throwable) throws Exception {
+                        error(throwable.toString());
+                    }
+                }
+        );
+    }
+
+    public static void removeMoment(final String momentId) {
+        PPJSONObject jBody = new PPJSONObject();
+        jBody
+                .put("id", momentId);
+
+        final Observable<String> apiResult = PPRetrofit.getInstance()
+                .api("moment.del", jBody.getJSONObject());
+
+        apiResult
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        new Consumer<String>() {
+                            @Override
+                            public void accept(@NonNull String s) throws Exception {
+
+                                PPWarn ppWarn = ppWarning(s);
+
+                                //pptodo 如果是已被删除错误提示也可以认为成功
+                                if (ppWarn != null && ppWarn.code != 1001) {
+                                    throw new Exception(ppWarn.msg);
+                                }
+
+                                try (Realm realm = Realm.getDefaultInstance()) {
+                                    realm.beginTransaction();
+                                    //这里用findAll().deleteAllFromRealm()就不用考虑多线程的问题, 最多查出来结果是空的list, 然后调用deleteAllFromRealm(), 应该不会出错
+                                    realm.where(Moment.class).equalTo("id", momentId).findAll().deleteAllFromRealm();
+                                    realm.commitTransaction();
+                                }
+                            }
+                        },
+                        new Consumer<Throwable>() {
+                            @Override
+                            public void accept(@NonNull Throwable throwable) throws Exception {
+                                error(throwable.toString());
+                                //pptodo 如果是断网状况就不用重试了, 在重现连上网的时候重新删除即可
+                                removeMoment(momentId);
+                            }
+                        }
+                );
+    }
     //------------------------------private------------------------------
     //设置DefaultConfiguration for 登录用户
     public static void initRealm(String userId) {
@@ -905,6 +1166,30 @@ public class PPApplication extends Application {
         }
 
         Realm.setDefaultConfiguration(config);
+    }
+
+    private static Observable<String> uploadSingleImage(final byte[] data, final String key, final String token) {
+        return Observable.create(new ObservableOnSubscribe<String>() {
+            @Override
+            public void subscribe(final ObservableEmitter<String> emitter) throws Exception {
+                uploadManager.put(data, key, token,
+                        new UpCompletionHandler() {
+                            @Override
+                            public void complete(String key, ResponseInfo info, JSONObject res) {
+                                //res包含hash、key等信息，具体字段取决于上传策略的设置
+                                if (info.isOK()) {
+                                    emitter.onNext(key);
+                                    emitter.onComplete();
+                                } else {
+                                    Log.i("qiniu", "Upload Fail");
+                                    //如果失败，这里可以把info信息上报自己的服务器，便于后面分析上传错误原因
+                                    Exception apiError = new Exception("七牛上传:" + key + "失败", new Throwable(info.error.toString()));
+                                    emitter.onError(apiError);
+                                }
+                            }
+                        }, null);
+            }
+        });
     }
 
     public static void startSocket() throws Exception {
