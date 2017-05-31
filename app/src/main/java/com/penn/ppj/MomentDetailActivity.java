@@ -122,8 +122,8 @@ public class MomentDetailActivity extends AppCompatActivity {
                     @Override
                     public void onClick(View v) {
                         if (momentDetail.getUserId().equals(PPApplication.getCurrentUserId())) {
-//                            Intent intent = new Intent(MomentDetailActivity.this, MyProfileActivity.class);
-//                            MomentDetailActivity.this.startActivity(intent);
+                            Intent intent = new Intent(MomentDetailActivity.this, MyProfileActivity.class);
+                            MomentDetailActivity.this.startActivity(intent);
                         } else {
                             Intent intent = new Intent(MomentDetailActivity.this, UserHomePageActivity.class);
                             intent.putExtra("userId", momentDetail.getUserId());
@@ -168,8 +168,8 @@ public class MomentDetailActivity extends AppCompatActivity {
                     public void onClick(View v) {
                         String userId = comment.getUserId();
                         if (userId.equals(PPApplication.getCurrentUserId())) {
-//                            Intent intent = new Intent(MomentDetailActivity.this, MyProfileActivity.class);
-//                            MomentDetailActivity.this.startActivity(intent);
+                            Intent intent = new Intent(MomentDetailActivity.this, MyProfileActivity.class);
+                            MomentDetailActivity.this.startActivity(intent);
                         } else {
                             Intent intent = new Intent(MomentDetailActivity.this, UserHomePageActivity.class);
                             intent.putExtra("userId", userId);

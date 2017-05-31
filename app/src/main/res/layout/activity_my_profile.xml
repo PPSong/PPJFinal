@@ -1,0 +1,87 @@
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:context="com.penn.ppj.MyProfileActivity">
+
+    <data>
+
+        <variable
+            name="data"
+            type="com.penn.ppj.model.realm.CurrentUser" />
+    </data>
+
+    <android.support.design.widget.CoordinatorLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <LinearLayout
+            android:id="@+id/main_linear_layout"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+
+            <de.hdodenhof.circleimageview.CircleImageView
+                android:layout_marginTop="32dp"
+                android:padding="4dp"
+                android:id="@+id/avatar_image_view"
+                android:layout_width="@dimen/avatar_super_big"
+                android:layout_height="@dimen/avatar_super_big"
+                app:avatarImageUrl="@{data.avatar}" />
+
+            <TextView
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="16dp"
+                android:id="@+id/nickname_text_view"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@{data.nickname}"
+                style="@style/Widget.Plaid.PlayerTitle"/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <Button
+                    android:id="@+id/fans_button"
+                    style="@style/InlineActionButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:drawableTop="@drawable/avd_likes"
+                    tools:text="33 likes" />
+
+                <Button
+                    android:id="@+id/follows_button"
+                    style="@style/InlineActionButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:drawableTop="@drawable/avd_views"
+                    tools:text="33 views" />
+
+                <Button
+                    android:id="@+id/friends_button"
+                    style="@style/InlineActionButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:drawableTop="@drawable/avd_followers"
+                    tools:text="33 views" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <ImageButton
+            android:id="@+id/back_image_button"
+            android:layout_width="@dimen/icon"
+            android:layout_height="@dimen/icon"
+            android:layout_marginLeft="16dp"
+            android:layout_marginTop="32dp"
+            android:background="@android:color/transparent"
+            android:src="@drawable/ic_arrow_back_black_24dp" />
+
+    </android.support.design.widget.CoordinatorLayout>
+
+</layout>
