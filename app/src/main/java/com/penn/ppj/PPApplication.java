@@ -14,6 +14,10 @@ import android.text.TextUtils;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.TypedValue;
+import android.view.MotionEvent;
+import android.view.View;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.Toast;
 
@@ -285,17 +289,47 @@ public class PPApplication extends Application {
 
     @BindingAdapter({"bind:image800"})
     public static void image800(final ImageView imageView, String pic) {
-        setImageViewResource(imageView, pic, 800*2);
+        setImageViewResource(imageView, pic, 800 * 2);
     }
 
     @BindingAdapter({"bind:image180"})
     public static void image180(final ImageView imageView, String pic) {
-        setImageViewResource(imageView, pic, 180*4);
+        setImageViewResource(imageView, pic, 180 * 4);
     }
 
     @BindingAdapter({"bind:image40"})
     public static void image40(final ImageView imageView, String pic) {
-        setImageViewResource(imageView, pic, 40*4);
+        setImageViewResource(imageView, pic, 40 * 4);
+    }
+
+    public static void hideKeyboard(MotionEvent event, View view,
+                                    Activity activity) {
+        try {
+            if (view != null && view instanceof EditText) {
+                int[] location = {0, 0};
+                view.getLocationInWindow(location);
+                int left = location[0], top = location[1], right = left
+                        + view.getWidth(), bootom = top + view.getHeight();
+                // 判断焦点位置坐标是否在空间内，如果位置在控件外，则隐藏键盘
+                if (event.getRawX() < left || event.getRawX() > right
+                        || event.getY() < top || event.getRawY() > bootom) {
+                    // 隐藏键盘
+                    hideKeyboard(activity);
+                    //取消焦点
+                    view.clearFocus();
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void hideKeyboard(Activity activity) {
+        View view = activity.getCurrentFocus();
+        if (view != null) {
+            InputMethodManager imm = (InputMethodManager) activity.getSystemService(Context.INPUT_METHOD_SERVICE);
+            imm.hideSoftInputFromWindow(view.getWindowToken(), InputMethodManager.HIDE_NOT_ALWAYS);
+        }
     }
 
     public static String get800ImageUrl(String imageName) {
@@ -1152,6 +1186,82 @@ public class PPApplication extends Application {
         }
     }
 
+    //failed后retry
+    public static void uploadComment(final String key) {
+        String momentId;
+        String content;
+        String targetUserId;
+        boolean bePrivate;
+
+        try (Realm realm = Realm.getDefaultInstance()) {
+            realm.beginTransaction();
+
+            Comment comment = realm.where(Comment.class).equalTo("key", key).findFirst();
+            comment.setStatus(CommentStatus.LOCAL);
+
+            realm.commitTransaction();
+
+            momentId = comment.getMomentId();
+            content = comment.getContent();
+            targetUserId = comment.getReferUserId();
+            bePrivate = comment.isBePrivate();
+        }
+
+        //发送comment
+        PPJSONObject jBody = new PPJSONObject();
+        jBody
+                .put("id", momentId)
+                .put("content", content)
+                .put("refer", targetUserId)
+                .put("isPrivate", "" + bePrivate);
+
+        final Observable<String> apiResult = PPRetrofit.getInstance()
+                .api("moment.reply", jBody.getJSONObject());
+
+        apiResult
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        new Consumer<String>() {
+                            @Override
+                            public void accept(@NonNull String s) throws Exception {
+                                PPWarn ppWarn = PPApplication.ppWarning(s);
+
+                                if (ppWarn != null) {
+                                    throw new Exception(ppWarn.msg);
+                                }
+
+                                try (Realm realm = Realm.getDefaultInstance()) {
+
+                                    realm.beginTransaction();
+
+                                    Comment comment = realm.where(Comment.class).equalTo("key", key).findFirst();
+                                    comment.setStatus(CommentStatus.NET);
+
+                                    realm.commitTransaction();
+                                }
+                            }
+                        },
+                        new Consumer<Throwable>() {
+                            @Override
+                            public void accept(@NonNull Throwable throwable) throws Exception {
+                                try (Realm realm = Realm.getDefaultInstance()) {
+
+                                    realm.beginTransaction();
+
+                                    Comment comment = realm.where(Comment.class).equalTo("key", key).findFirst();
+                                    comment.setStatus(CommentStatus.FAILED);
+
+                                    realm.commitTransaction();
+                                }
+
+                                error(throwable.toString());
+                            }
+                        }
+                );
+    }
+
+    //failed后retry
     public static void uploadMoment(final String momentCreatingKey) {
         final byte[] imageData;
         String address;
@@ -1167,6 +1277,23 @@ public class PPApplication extends Application {
             geo = momentCreating.getGeo();
             content = momentCreating.getContent();
             createTime = momentCreating.getCreateTime();
+
+            //修改momentCreating, moment状态为LOCAL
+            try {
+                realm.beginTransaction();
+
+                momentCreating.setStatus(MomentStatus.LOCAL);
+
+                Moment moment = realm.where(Moment.class).equalTo("key", momentCreatingKey).findFirst();
+                moment.setStatus(MomentStatus.LOCAL);
+
+                realm.commitTransaction();
+
+            } catch (Exception e) {
+                error(e.toString());
+                realm.cancelTransaction();
+                return;
+            }
         }
 
         //申请上传图片的token

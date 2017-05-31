@@ -1,5 +1,9 @@
 package com.penn.ppj.model.realm;
 
+import android.view.View;
+
+import com.penn.ppj.PPApplication;
+import com.penn.ppj.ppEnum.CommentStatus;
 import com.penn.ppj.ppEnum.MomentStatus;
 
 import io.realm.RealmObject;
@@ -82,5 +86,9 @@ public class Moment extends RealmObject {
 
     public void setAvatar(String avatar) {
         this.avatar = avatar;
+    }
+
+    public int uploadError() {
+        return status.equals(MomentStatus.FAILED.toString()) ? View.VISIBLE : View.INVISIBLE;
     }
 }

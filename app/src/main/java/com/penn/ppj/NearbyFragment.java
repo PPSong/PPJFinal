@@ -240,7 +240,7 @@ public class NearbyFragment extends Fragment {
                                 ppLoadController.endRefreshSpinner();
                             }
                         })
-                        .observeOn(Schedulers.io())
+                        .observeOn(AndroidSchedulers.mainThread())
                         .subscribe(
                                 new Consumer<String>() {
                                     @Override

@@ -21,6 +21,7 @@ import com.penn.ppj.messageEvent.UserLogoutEvent;
 import com.penn.ppj.model.realm.CurrentUser;
 import com.penn.ppj.model.realm.Moment;
 import com.penn.ppj.model.realm.NearbyMoment;
+import com.penn.ppj.ppEnum.MomentStatus;
 import com.penn.ppj.util.PPJSONObject;
 import com.penn.ppj.util.PPLoadController;
 import com.penn.ppj.util.PPLoadDataAdapter;
@@ -87,9 +88,15 @@ public class DashboardFragment extends Fragment {
                     if (PPApplication.isLogin()) {
                         int position = binding.recyclerView.getChildAdapterPosition(v);
                         Moment moment = data.get(position);
-                        Intent intent = new Intent(getContext(), MomentDetailActivity.class);
-                        intent.putExtra("momentId", moment.getId());
-                        startActivity(intent);
+
+                        if (moment.getStatus() == MomentStatus.FAILED) {
+                            //如果是失败状态, 点击重新上传
+                            PPApplication.uploadMoment(moment.getKey());
+                        } else {
+                            Intent intent = new Intent(getContext(), MomentDetailActivity.class);
+                            intent.putExtra("momentId", moment.getId());
+                            startActivity(intent);
+                        }
                     } else {
                         PPApplication.goLogin(getActivity());
                     }
@@ -195,7 +202,8 @@ public class DashboardFragment extends Fragment {
         realm = Realm.getDefaultInstance();
 
         //先取得本地数据库中的moments
-        moments = realm.where(Moment.class).notEqualTo("deleted", true).findAllSorted("createTime", Sort.DESCENDING);;
+        moments = realm.where(Moment.class).notEqualTo("deleted", true).findAllSorted("createTime", Sort.DESCENDING);
+        ;
         //设置moments动态更新
         moments.addChangeListener(new OrderedRealmCollectionChangeListener<RealmResults<Moment>>() {
             @Override

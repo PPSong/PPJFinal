@@ -22,6 +22,14 @@
             app:layout_aspectRatio="133%"
             app:layout_widthPercent="100%" />
 
+        <ImageView
+            android:id="@+id/upload_error"
+            android:layout_width="@dimen/small_icon"
+            android:layout_height="@dimen/small_icon"
+            android:src="@drawable/ic_error_black_24dp"
+            android:tint="@android:color/holo_red_light"
+            android:visibility="@{data.uploadError()}" />
+
     </android.support.percent.PercentFrameLayout>
 
 </layout>

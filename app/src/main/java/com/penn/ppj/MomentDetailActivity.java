@@ -146,6 +146,11 @@ public class MomentDetailActivity extends AppCompatActivity {
 
                         if (!comment.getUserId().equals(PPApplication.getCurrentUserId())) {
                             commentTo(comment);
+                        } else {
+                            if (comment.getStatus() == CommentStatus.FAILED) {
+                                //如果是当前登录用户, 并且状态为FAILED
+                                PPApplication.uploadComment(comment.getKey());
+                            }
                         }
                     }
                 });
