@@ -25,6 +25,7 @@ import com.google.gson.JsonPrimitive;
 import com.penn.ppj.messageEvent.MomentPublishEvent;
 import com.penn.ppj.messageEvent.UserLoginEvent;
 import com.penn.ppj.messageEvent.UserLogoutEvent;
+import com.penn.ppj.model.realm.Comment;
 import com.penn.ppj.model.realm.CurrentUser;
 import com.penn.ppj.model.realm.Message;
 import com.penn.ppj.model.realm.Moment;
@@ -1109,6 +1110,50 @@ public class PPApplication extends Application {
                     }
                 }
         );
+    }
+
+    public static void removeComment(final String commentId, final String momentId) {
+
+        PPJSONObject jBody = new PPJSONObject();
+        jBody
+                .put("replyID", commentId)
+                .put("momentID", momentId);
+
+        final Observable<String> apiResult = PPRetrofit.getInstance()
+                .api("moment.delReply", jBody.getJSONObject());
+
+        apiResult
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        new Consumer<String>() {
+                            @Override
+                            public void accept(@NonNull String s) throws Exception {
+
+                                PPWarn ppWarn = ppWarning(s);
+
+                                //pptodo 如果是已被删除错误提示也可以认为成功
+                                if (ppWarn != null && ppWarn.code != 1001) {
+                                    throw new Exception(ppWarn.msg);
+                                }
+
+                                try (Realm realm1 = Realm.getDefaultInstance()) {
+                                    realm1.beginTransaction();
+                                    //这里用findAll().deleteAllFromRealm()就不用考虑多线程的问题, 最多查出来结果是空的list, 然后调用deleteAllFromRealm(), 应该不会出错
+                                    realm1.where(Comment.class).equalTo("id", commentId).findAll().deleteAllFromRealm();
+                                    realm1.commitTransaction();
+                                }
+                            }
+                        },
+                        new Consumer<Throwable>() {
+                            @Override
+                            public void accept(@NonNull Throwable throwable) throws Exception {
+                                error(throwable.toString());
+                                //pptodo 如果是断网状况就不用重试了, 在重现连上网的时候重新删除即可
+                                removeComment(commentId, momentId);
+                            }
+                        }
+                );
     }
 
     public static void removeMoment(final String momentId) {

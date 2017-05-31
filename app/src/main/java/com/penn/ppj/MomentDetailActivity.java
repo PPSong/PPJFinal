@@ -161,13 +161,46 @@ public class MomentDetailActivity extends AppCompatActivity {
                 ((PPHead) holder).binding.setData(momentDetail);
             } else {
                 final Comment comment = data.get(position - 1);
-                final int tmpPostion = position;
                 ((PPHoldView) holder).binding.setData(comment);
 
                 ((PPHoldView) holder).binding.deleteImageButton.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
+                        if (comment.getStatus().equals(CommentStatus.NET)) {
+                            final String commentId = comment.getId();
+                            final String momentId = comment.getMomentId();
+                            //确认对话框
+                            AlertDialog.Builder alert = new AlertDialog.Builder(
+                                    MomentDetailActivity.this);
+                            alert.setTitle(getString(R.string.warn));
+                            alert.setMessage(getString(R.string.delete_are_you_sure));
+                            alert.setPositiveButton(android.R.string.yes, new DialogInterface.OnClickListener() {
 
+                                @Override
+                                public void onClick(DialogInterface dialog, int which) {
+                                    //标记本地comment deleted为true
+                                    try (Realm realm = Realm.getDefaultInstance()) {
+                                        realm.beginTransaction();
+
+                                        realm.where(Comment.class).equalTo("id", commentId).findFirst().setDeleted(true);
+
+                                        realm.commitTransaction();
+                                    }
+                                    PPApplication.removeComment(commentId, momentId);
+                                    dialog.dismiss();
+                                }
+                            });
+                            alert.setNegativeButton(android.R.string.no, new DialogInterface.OnClickListener() {
+
+                                @Override
+                                public void onClick(DialogInterface dialog, int which) {
+
+                                    dialog.dismiss();
+                                }
+                            });
+
+                            alert.show();
+                        }
                     }
                 });
             }
