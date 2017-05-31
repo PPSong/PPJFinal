@@ -1221,7 +1221,7 @@ public class PPApplication extends Application {
         Realm.setDefaultConfiguration(config);
     }
 
-    private static Observable<String> uploadSingleImage(final byte[] data, final String key, final String token) {
+    public static Observable<String> uploadSingleImage(final byte[] data, final String key, final String token) {
         return Observable.create(new ObservableOnSubscribe<String>() {
             @Override
             public void subscribe(final ObservableEmitter<String> emitter) throws Exception {

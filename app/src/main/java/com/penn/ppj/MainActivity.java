@@ -187,8 +187,13 @@ public class MainActivity extends AppCompatActivity {
         binding.fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Intent intent = new Intent(MainActivity.this, MomentCreatingActivity.class);
-                startActivity(intent);
+                if (PPApplication.isLogin()) {
+                    Intent intent = new Intent(MainActivity.this, MomentCreatingActivity.class);
+                    startActivity(intent);
+                } else {
+                    PPApplication.goLogin(MainActivity.this);
+                }
+
             }
         });
 
