@@ -25,6 +25,7 @@ import com.penn.ppj.databinding.CommentCellBinding;
 import com.penn.ppj.databinding.MomentDetailHeadBinding;
 import com.penn.ppj.messageEvent.MomentDeleteEvent;
 import com.penn.ppj.model.realm.Comment;
+import com.penn.ppj.model.realm.CurrentUser;
 import com.penn.ppj.model.realm.Moment;
 import com.penn.ppj.model.realm.MomentDetail;
 import com.penn.ppj.ppEnum.CommentStatus;
@@ -72,6 +73,7 @@ public class MomentDetailActivity extends AppCompatActivity {
     private PPAdapter ppAdapter;
     private LinearLayoutManager linearLayoutManager;
     private MomentDetailHeadBinding momentDetailHeadBinding;
+    private CommentInputBottomSheetDialogFragment.CommentViewModel commentViewModel;
 
     private int titleHeight;
     private int headPicHeight;
@@ -137,7 +139,13 @@ public class MomentDetailActivity extends AppCompatActivity {
                 commentCellBinding.getRoot().setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
+                        int position = binding.recyclerView.getChildAdapterPosition(v);
+                        //由于第一个cell被head占了
+                        Comment comment = comments.get(position - 1);
 
+                        if (!comment.getUserId().equals(PPApplication.getCurrentUserId())) {
+                            commentTo(comment);
+                        }
                     }
                 });
 
@@ -350,27 +358,25 @@ public class MomentDetailActivity extends AppCompatActivity {
                         }
                 );
 
+        //init commentViewModel
+        commentViewModel = new CommentInputBottomSheetDialogFragment.CommentViewModel();
 
-//        //showComment按钮监控
-//        Observable<Object> showCommentInputButtonObservable = RxView.clicks(binding.commentFloatingActionButton)
-//                .debounce(200, TimeUnit.MILLISECONDS);
-//
-//        showCommentInputButtonObservable
-//                .subscribeOn(AndroidSchedulers.mainThread())
-//                .observeOn(AndroidSchedulers.mainThread())
-//                .subscribe(
-//                        new Consumer<Object>() {
-//                            public void accept(Object o) {
-//                                if (commentViewModel.targetUserId != "") {
-//                                    resetComment();
-//                                    setTarget(null);
-//                                }
-//                                showCommentInput();
-//                            }
-//                        }
-//                );
-//
-//        commentViewModel = new CommentInputBottomSheetDialogFragment.CommentViewModel();
+        //showComment按钮监控
+        RxView.clicks(binding.commentFloatingActionButton)
+                .debounce(200, TimeUnit.MILLISECONDS)
+                .subscribeOn(AndroidSchedulers.mainThread())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(
+                        new Consumer<Object>() {
+                            public void accept(Object o) {
+                                if (commentViewModel.targetUserId != "") {
+                                    resetComment();
+                                    setTarget(null);
+                                }
+                                showCommentInput();
+                            }
+                        }
+                );
 
         //由于momentDetailHeadBinding是在onCreateViewHolder中初始化的, 怀疑 ppAdapter = new PPAdapter(comments);是个异步操作
         //这里不用延时的话会导致momentDetailHeadBinding null错误
@@ -645,5 +651,113 @@ public class MomentDetailActivity extends AppCompatActivity {
         floatingActionButton.setLayoutParams(params);
 
         floatingActionButton.startAnimation(AnimationUtils.loadAnimation(this, R.anim.appear));
+    }
+
+    private void setTarget(Comment comment) {
+        if (comment != null) {
+            commentViewModel.targetUserId = comment.getUserId();
+            commentViewModel.targetNickname = comment.getNickname();
+        } else {
+            commentViewModel.targetUserId = "";
+            commentViewModel.targetNickname = "";
+        }
+    }
+
+    private void resetComment() {
+        commentViewModel.reset();
+    }
+
+    private void showCommentInput() {
+        CommentInputBottomSheetDialogFragment commentInputBottomSheetDialogFragment = CommentInputBottomSheetDialogFragment.newInstance(commentViewModel);
+        commentInputBottomSheetDialogFragment.setCommentInputBottomSheetDialogFragmentListener(new CommentInputBottomSheetDialogFragment.CommentInputBottomSheetDialogFragmentListener() {
+            @Override
+            public void setCommentViewModel(CommentInputBottomSheetDialogFragment.CommentViewModel commentViewModel) {
+                MomentDetailActivity.this.commentViewModel = commentViewModel;
+            }
+
+            @Override
+            public void sendComment() {
+                //插入到本地数据库
+                final long now = System.currentTimeMillis();
+
+                CurrentUser currentUser = realm.where(CurrentUser.class).findFirst();
+
+                final Comment comment = new Comment();
+                comment.setKey(now + "_" + currentUser.getUserId());
+                comment.setUserId(currentUser.getUserId());
+                comment.setMomentId(momentId);
+                comment.setCreateTime(now);
+                comment.setNickname(currentUser.getNickname());
+                comment.setAvatar(currentUser.getAvatar());
+                comment.setContent(commentViewModel.content);
+
+                comment.setBePrivate(commentViewModel.bePrivate);
+
+                comment.setStatus(CommentStatus.LOCAL);
+                comment.setLastVisitTime(now);
+
+                realm.beginTransaction();
+
+                realm.insert(comment);
+
+                realm.commitTransaction();
+
+                binding.recyclerView.smoothScrollToPosition(0);
+
+                //发送comment
+                PPJSONObject jBody = new PPJSONObject();
+                jBody
+                        .put("id", momentId)
+                        .put("content", commentViewModel.content)
+                        .put("refer", commentViewModel.targetUserId)
+                        .put("isPrivate", "" + commentViewModel.bePrivate);
+
+                final Observable<String> apiResult = PPRetrofit.getInstance()
+                        .api("moment.reply", jBody.getJSONObject());
+
+                final Comment comment2 = realm.where(Comment.class).equalTo("key", now + "_" + PPApplication.getCurrentUserId()).findFirst();
+
+                apiResult
+                        .subscribeOn(Schedulers.io())
+                        .observeOn(AndroidSchedulers.mainThread())
+                        .subscribe(
+                                new Consumer<String>() {
+                                    @Override
+                                    public void accept(@NonNull String s) throws Exception {
+
+                                        PPWarn ppWarn = PPApplication.ppWarning(s);
+
+                                        if (ppWarn != null) {
+                                            throw new Exception(ppWarn.msg);
+                                        }
+
+                                        getServerMomentDetail();
+                                    }
+                                },
+                                new Consumer<Throwable>() {
+                                    @Override
+                                    public void accept(@NonNull Throwable throwable) throws Exception {
+                                        realm.beginTransaction();
+                                        comment2.setStatus(CommentStatus.FAILED);
+                                        realm.copyToRealm(comment2);
+
+                                        realm.commitTransaction();
+                                        PPApplication.error(throwable.toString());
+                                    }
+                                }
+                        );
+
+                resetComment();
+            }
+        });
+        commentInputBottomSheetDialogFragment.show(getSupportFragmentManager(), "Dialog");
+    }
+
+    private void commentTo(Comment comment) {
+        if (!commentViewModel.targetUserId.equals(comment.getUserId())) {
+            resetComment();
+            setTarget(comment);
+        }
+        showCommentInput();
     }
 }
